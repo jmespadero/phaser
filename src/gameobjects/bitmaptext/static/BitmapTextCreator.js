@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var BitmapText = require('./BitmapText');
@@ -18,7 +18,7 @@ var GetValue = require('../../../utils/object/GetValue');
  * @method Phaser.GameObjects.GameObjectCreator#bitmapText
  * @since 3.0.0
  *
- * @param {BitmapTextConfig} config - The configuration object this Game Object will use to create itself.
+ * @param {Phaser.Types.GameObjects.BitmapText.BitmapTextConfig} config - The configuration object this Game Object will use to create itself.
  * @param {boolean} [addToScene] - Add this Game Object to the Scene after creating it? If set this argument overrides the `add` property in the config object.
  * 
  * @return {Phaser.GameObjects.BitmapText} The Game Object that was created.
@@ -30,10 +30,9 @@ GameObjectCreator.register('bitmapText', function (config, addToScene)
     var font = GetValue(config, 'font', '');
     var text = GetAdvancedValue(config, 'text', '');
     var size = GetAdvancedValue(config, 'size', false);
+    var align = GetValue(config, 'align', 0);
 
-    // var align = GetValue(config, 'align', 'left');
-
-    var bitmapText = new BitmapText(this.scene, 0, 0, font, text, size);
+    var bitmapText = new BitmapText(this.scene, 0, 0, font, text, size, align);
 
     if (addToScene !== undefined)
     {

@@ -1,12 +1,12 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Clamp = require('../math/Clamp');
 var Class = require('../utils/Class');
-var CONST = require('./const');
+var Events = require('./events');
 var GetFastValue = require('../utils/object/GetFastValue');
 var PluginCache = require('../plugins/PluginCache');
 
@@ -15,7 +15,7 @@ var PluginCache = require('../plugins/PluginCache');
  * A proxy class to the Global Scene Manager.
  *
  * @class ScenePlugin
- * @memberOf Phaser.Scenes
+ * @memberof Phaser.Scenes
  * @constructor
  * @since 3.0.0
  *
@@ -49,7 +49,7 @@ var ScenePlugin = new Class({
          * The settings of the Scene this ScenePlugin belongs to.
          *
          * @name Phaser.Scenes.ScenePlugin#settings
-         * @type {Phaser.Scenes.Settings.Object}
+         * @type {Phaser.Types.Scenes.SettingsObject}
          * @since 3.0.0
          */
         this.settings = scene.sys.settings;
@@ -77,7 +77,7 @@ var ScenePlugin = new Class({
          * the current percentage of the transition progress, between 0 and 1.
          *
          * @name Phaser.Scenes.ScenePlugin#transitionProgress
-         * @type {float}
+         * @type {number}
          * @since 3.5.0
          */
         this.transitionProgress = 0;
@@ -152,8 +152,8 @@ var ScenePlugin = new Class({
          */
         this._willRemove = false;
 
-        scene.sys.events.once('boot', this.boot, this);
-        scene.sys.events.on('start', this.pluginStart, this);
+        scene.sys.events.once(Events.BOOT, this.boot, this);
+        scene.sys.events.on(Events.START, this.pluginStart, this);
     },
 
     /**
@@ -166,7 +166,7 @@ var ScenePlugin = new Class({
      */
     boot: function ()
     {
-        this.systems.events.once('destroy', this.destroy, this);
+        this.systems.events.once(Events.DESTROY, this.destroy, this);
     },
 
     /**
@@ -182,7 +182,7 @@ var ScenePlugin = new Class({
     {
         this._target = null;
 
-        this.systems.events.once('shutdown', this.shutdown, this);
+        this.systems.events.once(Events.SHUTDOWN, this.shutdown, this);
     },
 
     /**
@@ -191,7 +191,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#start
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to start.
+     * @param {string} [key] - The Scene to start.
      * @param {object} [data] - The Scene data.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
@@ -200,16 +200,8 @@ var ScenePlugin = new Class({
     {
         if (key === undefined) { key = this.key; }
 
-        if (this.settings.status !== CONST.RUNNING)
-        {
-            this.manager.queueOp('stop', this.key);
-            this.manager.queueOp('start', key, data);
-        }
-        else
-        {
-            this.manager.stop(this.key);
-            this.manager.start(key, data);
-        }
+        this.manager.queueOp('stop', this.key);
+        this.manager.queueOp('start', key, data);
 
         return this;
     },
@@ -219,7 +211,7 @@ var ScenePlugin = new Class({
      *
      * @method Phaser.Scenes.ScenePlugin#restart
      * @since 3.4.0
-     * 
+     *
      * @param {object} [data] - The Scene data.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
@@ -228,56 +220,34 @@ var ScenePlugin = new Class({
     {
         var key = this.key;
 
-        if (this.settings.status !== CONST.RUNNING)
-        {
-            this.manager.queueOp('stop', key);
-            this.manager.queueOp('start', key, data);
-        }
-        else
-        {
-            this.manager.stop(key);
-            this.manager.start(key, data);
-        }
+        this.manager.queueOp('stop', key);
+        this.manager.queueOp('start', key, data);
 
         return this;
     },
 
     /**
-     * @typedef {object} Phaser.Scenes.ScenePlugin.SceneTransitionConfig
-     * 
-     * @property {string} target - The Scene key to transition to.
-     * @property {integer} [duration=1000] - The duration, in ms, for the transition to last.
-     * @property {boolean} [sleep=false] - Will the Scene responsible for the transition be sent to sleep on completion (`true`), or stopped? (`false`)
-     * @property {boolean} [allowInput=false] - Will the Scenes Input system be able to process events while it is transitioning in or out?
-     * @property {boolean} [moveAbove] - More the target Scene to be above this one before the transition starts.
-     * @property {boolean} [moveBelow] - More the target Scene to be below this one before the transition starts.
-     * @property {function} [onUpdate] - This callback is invoked every frame for the duration of the transition.
-     * @property {any} [onUpdateScope] - The context in which the callback is invoked.
-     * @property {any} [data] - An object containing any data you wish to be passed to the target Scenes init / create methods.
-     */
-
-    /**
      * This will start a transition from the current Scene to the target Scene given.
-     * 
+     *
      * The transition will last for the duration specified in milliseconds.
-     * 
+     *
      * You can have the target Scene moved above or below this one in the display list.
-     * 
+     *
      * You can specify an update callback. This callback will be invoked _every frame_ for the duration
      * of the transition.
      *
      * This Scene can either be sent to sleep at the end of the transition, or stopped. The default is to stop.
-     * 
-     * There are also 5 transition related events: This scene will emit the event `transitionto` when
+     *
+     * There are also 5 transition related events: This scene will emit the event `transitionout` when
      * the transition begins, which is typically the frame after calling this method.
-     * 
+     *
      * The target Scene will emit the event `transitioninit` when that Scene's `init` method is called.
      * It will then emit the event `transitionstart` when its `create` method is called.
      * If the Scene was sleeping and has been woken up, it will emit the event `transitionwake` instead of these two,
-     * as the Scenes `init` and `create` methods are not invoked when a sleep wakes up.
-     * 
+     * as the Scenes `init` and `create` methods are not invoked when a Scene wakes up.
+     *
      * When the duration of the transition has elapsed it will emit the event `transitioncomplete`.
-     * These events are all cleared of listeners when the Scene shuts down, but not if it is sent to sleep.
+     * These events are cleared of all listeners when the Scene shuts down, but not if it is sent to sleep.
      *
      * It's important to understand that the duration of the transition begins the moment you call this method.
      * If the Scene you are transitioning to includes delayed processes, such as waiting for files to load, the
@@ -285,11 +255,12 @@ var ScenePlugin = new Class({
      * this Scenes update loop to stop, then the transition will also pause for that duration. There are
      * checks in place to prevent you accidentally stopping a transitioning Scene but if you've got code to
      * override this understand that until the target Scene completes it might never be unlocked for input events.
-     * 
+     *
      * @method Phaser.Scenes.ScenePlugin#transition
+     * @fires Phaser.Scenes.Events#TRANSITION_OUT
      * @since 3.5.0
      *
-     * @param {Phaser.Scenes.ScenePlugin.SceneTransitionConfig} config - The transition configuration object.
+     * @param {Phaser.Types.Scenes.SceneTransitionConfig} config - The transition configuration object.
      *
      * @return {boolean} `true` is the transition was started, otherwise `false`.
      */
@@ -351,9 +322,9 @@ var ScenePlugin = new Class({
             this.manager.start(key, GetFastValue(config, 'data'));
         }
 
-        this.systems.events.emit('transitionout', target, duration);
+        this.systems.events.emit(Events.TRANSITION_OUT, target, duration);
 
-        this.systems.events.on('update', this.step, this);
+        this.systems.events.on(Events.UPDATE, this.step, this);
 
         return true;
     },
@@ -388,8 +359,8 @@ var ScenePlugin = new Class({
      * @private
      * @since 3.5.0
      *
-     * @param {number} time - [description]
-     * @param {number} delta - [description]
+     * @param {number} time - The current time. Either a High Resolution Timer value if it comes from Request Animation Frame, or Date.now if using SetTimeout.
+     * @param {number} delta - The delta time in ms since the last frame. This is a smoothed and capped value based on the FPS rate.
      */
     step: function (time, delta)
     {
@@ -413,6 +384,7 @@ var ScenePlugin = new Class({
      *
      * @method Phaser.Scenes.ScenePlugin#transitionComplete
      * @private
+     * @fires Phaser.Scenes.Events#TRANSITION_COMPLETE
      * @since 3.5.0
      */
     transitionComplete: function ()
@@ -421,10 +393,10 @@ var ScenePlugin = new Class({
         var targetSettings = this._target.sys.settings;
 
         //  Stop the step
-        this.systems.events.off('update', this.step, this);
+        this.systems.events.off(Events.UPDATE, this.step, this);
 
         //  Notify target scene
-        targetSys.events.emit('transitioncomplete', this.scene);
+        targetSys.events.emit(Events.TRANSITION_COMPLETE, this.scene);
 
         //  Clear target scene settings
         targetSettings.isTransition = false;
@@ -458,16 +430,15 @@ var ScenePlugin = new Class({
      * @since 3.0.0
      *
      * @param {string} key - The Scene key.
-     * @param {(Phaser.Scene|Phaser.Scenes.Settings.Config|function)} sceneConfig - The config for the Scene.
+     * @param {(Phaser.Scene|Phaser.Types.Scenes.SettingsConfig|Phaser.Types.Scenes.CreateSceneFromObjectConfig|function)} sceneConfig - The config for the Scene.
      * @param {boolean} autoStart - Whether to start the Scene after it's added.
+     * @param {object} [data] - Optional data object. This will be set as Scene.settings.data and passed to `Scene.init`.
      *
-     * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
+     * @return {Phaser.Scene} An instance of the Scene that was added to the Scene Manager.
      */
-    add: function (key, sceneConfig, autoStart)
+    add: function (key, sceneConfig, autoStart, data)
     {
-        this.manager.add(key, sceneConfig, autoStart);
-
-        return this;
+        return this.manager.add(key, sceneConfig, autoStart, data);
     },
 
     /**
@@ -485,14 +456,34 @@ var ScenePlugin = new Class({
     {
         if (key && key !== this.key)
         {
-            if (this.settings.status !== CONST.RUNNING)
-            {
-                this.manager.queueOp('start', key, data);
-            }
-            else
-            {
-                this.manager.start(key, data);
-            }
+            this.manager.queueOp('start', key, data);
+        }
+
+        return this;
+    },
+
+    /**
+     * Runs the given Scene, but does not change the state of this Scene.
+     *
+     * If the given Scene is paused, it will resume it. If sleeping, it will wake it.
+     * If not running at all, it will be started.
+     *
+     * Use this if you wish to open a modal Scene by calling `pause` on the current
+     * Scene, then `run` on the modal Scene.
+     *
+     * @method Phaser.Scenes.ScenePlugin#run
+     * @since 3.10.0
+     *
+     * @param {string} key - The Scene to run.
+     * @param {object} [data] - A data object that will be passed to the Scene and emitted in its ready, wake, or resume events.
+     *
+     * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
+     */
+    run: function (key, data)
+    {
+        if (key && key !== this.key)
+        {
+            this.manager.queueOp('run', key, data);
         }
 
         return this;
@@ -504,15 +495,16 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#pause
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to pause.
+     * @param {string} [key] - The Scene to pause.
+     * @param {object} [data] - An optional data object that will be passed to the Scene and emitted in its pause event.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    pause: function (key)
+    pause: function (key, data)
     {
         if (key === undefined) { key = this.key; }
 
-        this.manager.pause(key);
+        this.manager.queueOp('pause', key, data);
 
         return this;
     },
@@ -523,15 +515,16 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#resume
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to resume.
+     * @param {string} [key] - The Scene to resume.
+     * @param {object} [data] - An optional data object that will be passed to the Scene and emitted in its resume event.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    resume: function (key)
+    resume: function (key, data)
     {
         if (key === undefined) { key = this.key; }
 
-        this.manager.resume(key);
+        this.manager.queueOp('resume', key, data);
 
         return this;
     },
@@ -542,15 +535,16 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#sleep
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to put to sleep.
+     * @param {string} [key] - The Scene to put to sleep.
+     * @param {object} [data] - An optional data object that will be passed to the Scene and emitted in its sleep event.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    sleep: function (key)
+    sleep: function (key, data)
     {
         if (key === undefined) { key = this.key; }
 
-        this.manager.sleep(key);
+        this.manager.queueOp('sleep', key, data);
 
         return this;
     },
@@ -561,21 +555,27 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#wake
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to wake up.
+     * @param {string} [key] - The Scene to wake up.
+     * @param {object} [data] - An optional data object that will be passed to the Scene and emitted in its wake event.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    wake: function (key)
+    wake: function (key, data)
     {
         if (key === undefined) { key = this.key; }
 
-        this.manager.wake(key);
+        this.manager.queueOp('wake', key, data);
 
         return this;
     },
 
     /**
      * Makes this Scene sleep then starts the Scene given.
+     * 
+     * No checks are made to see if an instance of the given Scene is already running.
+     * Because Scenes in Phaser are non-exclusive, you are allowed to run multiple
+     * instances of them _at the same time_. This means, calling this function
+     * may launch another instance of the requested Scene if it's already running.
      *
      * @method Phaser.Scenes.ScenePlugin#switch
      * @since 3.0.0
@@ -588,14 +588,7 @@ var ScenePlugin = new Class({
     {
         if (key !== this.key)
         {
-            if (this.settings.status !== CONST.RUNNING)
-            {
-                this.manager.queueOp('switch', this.key, key);
-            }
-            else
-            {
-                this.manager.switch(this.key, key);
-            }
+            this.manager.queueOp('switch', this.key, key);
         }
 
         return this;
@@ -607,15 +600,16 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#stop
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to stop.
+     * @param {string} [key] - The Scene to stop.
+     * @param {any} [data] - Optional data object to pass to Scene.Systems.shutdown.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    stop: function (key)
+    stop: function (key, data)
     {
         if (key === undefined) { key = this.key; }
 
-        this.manager.stop(key);
+        this.manager.queueOp('stop', key, data);
 
         return this;
     },
@@ -626,12 +620,13 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#setActive
      * @since 3.0.0
      *
-     * @param {boolean} value - The active value.
-     * @param {string} [key] - The Scene to set the active state for.
+     * @param {boolean} value - If `true` the Scene will be resumed. If `false` it will be paused.
+     * @param {string} [key] - The Scene to set the active state of.
+     * @param {object} [data] - An optional data object that will be passed to the Scene and emitted with its events.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
-    setActive: function (value, key)
+    setActive: function (value, key, data)
     {
         if (key === undefined) { key = this.key; }
 
@@ -639,7 +634,7 @@ var ScenePlugin = new Class({
 
         if (scene)
         {
-            scene.sys.setActive(value);
+            scene.sys.setActive(value, data);
         }
 
         return this;
@@ -676,7 +671,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#isSleeping
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to check.
+     * @param {string} [key] - The Scene to check.
      *
      * @return {boolean} Whether the Scene is sleeping.
      */
@@ -688,14 +683,14 @@ var ScenePlugin = new Class({
     },
 
     /**
-     * Checks if the given Scene is active or not?
+     * Checks if the given Scene is running or not?
      *
      * @method Phaser.Scenes.ScenePlugin#isActive
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to check.
+     * @param {string} [key] - The Scene to check.
      *
-     * @return {boolean} Whether the Scene is active.
+     * @return {boolean} Whether the Scene is running.
      */
     isActive: function (key)
     {
@@ -705,12 +700,29 @@ var ScenePlugin = new Class({
     },
 
     /**
+     * Checks if the given Scene is paused or not?
+     *
+     * @method Phaser.Scenes.ScenePlugin#isPaused
+     * @since 3.17.0
+     *
+     * @param {string} [key] - The Scene to check.
+     *
+     * @return {boolean} Whether the Scene is paused.
+     */
+    isPaused: function (key)
+    {
+        if (key === undefined) { key = this.key; }
+
+        return this.manager.isPaused(key);
+    },
+
+    /**
      * Checks if the given Scene is visible or not?
      *
      * @method Phaser.Scenes.ScenePlugin#isVisible
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to check.
+     * @param {string} [key] - The Scene to check.
      *
      * @return {boolean} Whether the Scene is visible.
      */
@@ -808,7 +820,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#remove
      * @since 3.2.0
      *
-     * @param {(string|Phaser.Scene)} key - The Scene to be removed.
+     * @param {(string|Phaser.Scene)} [key] - The Scene to be removed.
      *
      * @return {Phaser.Scenes.SceneManager} This SceneManager.
      */
@@ -827,7 +839,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#moveUp
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to move.
+     * @param {string} [key] - The Scene to move.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
@@ -846,7 +858,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#moveDown
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to move.
+     * @param {string} [key] - The Scene to move.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
@@ -867,7 +879,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#bringToTop
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to move.
+     * @param {string} [key] - The Scene to move.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
@@ -888,7 +900,7 @@ var ScenePlugin = new Class({
      * @method Phaser.Scenes.ScenePlugin#sendToBack
      * @since 3.0.0
      *
-     * @param {string} key - The Scene to move.
+     * @param {string} [key] - The Scene to move.
      *
      * @return {Phaser.Scenes.ScenePlugin} This ScenePlugin object.
      */
@@ -945,9 +957,9 @@ var ScenePlugin = new Class({
     {
         var eventEmitter = this.systems.events;
 
-        eventEmitter.off('shutdown', this.shutdown, this);
-        eventEmitter.off('postupdate', this.step, this);
-        eventEmitter.off('transitionout');
+        eventEmitter.off(Events.SHUTDOWN, this.shutdown, this);
+        eventEmitter.off(Events.POST_UPDATE, this.step, this);
+        eventEmitter.off(Events.TRANSITION_OUT);
     },
 
     /**
@@ -962,7 +974,7 @@ var ScenePlugin = new Class({
     {
         this.shutdown();
 
-        this.scene.sys.events.off('start', this.start, this);
+        this.scene.sys.events.off(Events.START, this.start, this);
 
         this.scene = null;
         this.systems = null;

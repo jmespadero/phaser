@@ -1,10 +1,8 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
-
-var GameObject = require('../GameObject');
 
 /**
  * Renders this Game Object with the Canvas Renderer to the given Camera.
@@ -23,12 +21,7 @@ var GameObject = require('../GameObject');
  */
 var ImageCanvasRenderer = function (renderer, src, interpolationPercentage, camera, parentMatrix)
 {
-    if (GameObject.RENDER_MASK !== src.renderFlags || (src.cameraFilter > 0 && (src.cameraFilter & camera._id)))
-    {
-        return;
-    }
-
-    renderer.drawImage(src, camera, parentMatrix);
+    renderer.batchSprite(src, src.frame, camera, parentMatrix);
 };
 
 module.exports = ImageCanvasRenderer;

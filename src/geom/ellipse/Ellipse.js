@@ -1,13 +1,14 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../../utils/Class');
 var Contains = require('./Contains');
 var GetPoint = require('./GetPoint');
 var GetPoints = require('./GetPoints');
+var GEOM_CONST = require('../const');
 var Random = require('./Random');
 
 /**
@@ -19,7 +20,7 @@ var Random = require('./Random');
  * To render an Ellipse you should look at the capabilities of the Graphics class.
  *
  * @class Ellipse
- * @memberOf Phaser.Geom
+ * @memberof Phaser.Geom
  * @constructor
  * @since 3.0.0
  *
@@ -38,6 +39,17 @@ var Ellipse = new Class({
         if (y === undefined) { y = 0; }
         if (width === undefined) { width = 0; }
         if (height === undefined) { height = 0; }
+
+        /**
+         * The geometry constant type of this object: `GEOM_CONST.ELLIPSE`.
+         * Used for fast type comparisons.
+         *
+         * @name Phaser.Geom.Ellipse#type
+         * @type {integer}
+         * @readonly
+         * @since 3.19.0
+         */
+        this.type = GEOM_CONST.ELLIPSE;
 
         /**
          * The x position of the center of the ellipse.
@@ -106,7 +118,7 @@ var Ellipse = new Class({
      *
      * @generic {Phaser.Geom.Point} O - [out,$return]
      *
-     * @param {float} position - A value between 0 and 1, where 0 equals 0 degrees, 0.5 equals 180 degrees and 1 equals 360 around the ellipse.
+     * @param {number} position - A value between 0 and 1, where 0 equals 0 degrees, 0.5 equals 180 degrees and 1 equals 360 around the ellipse.
      * @param {(Phaser.Geom.Point|object)} [out] - An object to store the return values in. If not given a Point object will be created.
      *
      * @return {(Phaser.Geom.Point|object)} A Point, or point-like object, containing the coordinates of the point around the ellipse.

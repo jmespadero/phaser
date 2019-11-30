@@ -1,11 +1,12 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var BaseCache = require('./BaseCache');
 var Class = require('../utils/Class');
+var GameEvents = require('../core/events');
 
 /**
  * @classdesc
@@ -16,7 +17,7 @@ var Class = require('../utils/Class');
  * instances, one per type of file. You can also add your own custom caches.
  *
  * @class CacheManager
- * @memberOf Phaser.Cache
+ * @memberof Phaser.Cache
  * @constructor
  * @since 3.0.0
  *
@@ -94,6 +95,15 @@ var CacheManager = new Class({
         this.audio = new BaseCache();
 
         /**
+         * A Cache storing all non-streaming video files, typically added via the Loader.
+         *
+         * @name Phaser.Cache.CacheManager#video
+         * @type {Phaser.Cache.BaseCache}
+         * @since 3.20.0
+         */
+        this.video = new BaseCache();
+
+        /**
          * A Cache storing all text files, typically added via the Loader.
          *
          * @name Phaser.Cache.CacheManager#text
@@ -101,6 +111,15 @@ var CacheManager = new Class({
          * @since 3.0.0
          */
         this.text = new BaseCache();
+
+        /**
+         * A Cache storing all html files, typically added via the Loader.
+         *
+         * @name Phaser.Cache.CacheManager#html
+         * @type {Phaser.Cache.BaseCache}
+         * @since 3.12.0
+         */
+        this.html = new BaseCache();
 
         /**
          * A Cache storing all WaveFront OBJ files, typically added via the Loader.
@@ -140,7 +159,7 @@ var CacheManager = new Class({
          */
         this.custom = {};
 
-        this.game.events.once('destroy', this.destroy, this);
+        this.game.events.once(GameEvents.DESTROY, this.destroy, this);
     },
 
     /**
@@ -180,7 +199,9 @@ var CacheManager = new Class({
             'physics',
             'shader',
             'audio',
+            'video',
             'text',
+            'html',
             'obj',
             'tilemap',
             'xml'

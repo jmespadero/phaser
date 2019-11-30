@@ -1,15 +1,17 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Bodies = require('./lib/factory/Bodies');
+var Body = require('./lib/body/Body');
 var Class = require('../../utils/Class');
 var Common = require('./lib/core/Common');
 var Composite = require('./lib/body/Composite');
 var Engine = require('./lib/core/Engine');
 var EventEmitter = require('eventemitter3');
+var Events = require('./events');
 var GetFastValue = require('../../utils/object/GetFastValue');
 var GetValue = require('../../utils/object/GetValue');
 var MatterBody = require('./lib/body/Body');
@@ -24,12 +26,12 @@ var Vector = require('./lib/geometry/Vector');
  *
  * @class World
  * @extends Phaser.Events.EventEmitter
- * @memberOf Phaser.Physics.Matter
+ * @memberof Phaser.Physics.Matter
  * @constructor
  * @since 3.0.0
  *
- * @param {Phaser.Scene} scene - [description]
- * @param {object} config - [description]
+ * @param {Phaser.Scene} scene - The Scene to which this Matter World instance belongs.
+ * @param {Phaser.Types.Physics.Matter.MatterWorldConfig} config - The Matter World configuration object.
  */
 var World = new Class({
 
@@ -42,7 +44,7 @@ var World = new Class({
         EventEmitter.call(this);
 
         /**
-         * [description]
+         * The Scene to which this Matter World instance belongs.
          *
          * @name Phaser.Physics.Matter.World#scene
          * @type {Phaser.Scene}
@@ -51,7 +53,7 @@ var World = new Class({
         this.scene = scene;
 
         /**
-         * [description]
+         * An instance of the MatterJS Engine.
          *
          * @name Phaser.Physics.Matter.World#engine
          * @type {MatterJS.Engine}
@@ -96,8 +98,8 @@ var World = new Class({
             {
                 var x = GetFastValue(boundsConfig, 'x', 0);
                 var y = GetFastValue(boundsConfig, 'y', 0);
-                var width = GetFastValue(boundsConfig, 'width', scene.sys.game.config.width);
-                var height = GetFastValue(boundsConfig, 'height', scene.sys.game.config.height);
+                var width = GetFastValue(boundsConfig, 'width', scene.sys.scale.width);
+                var height = GetFastValue(boundsConfig, 'height', scene.sys.scale.height);
                 var thickness = GetFastValue(boundsConfig, 'thickness', 64);
                 var left = GetFastValue(boundsConfig, 'left', true);
                 var right = GetFastValue(boundsConfig, 'right', true);
@@ -109,7 +111,7 @@ var World = new Class({
         }
 
         /**
-         * [description]
+         * A flag that toggles if the world is enabled or not.
          *
          * @name Phaser.Physics.Matter.World#enabled
          * @type {boolean}
@@ -174,18 +176,54 @@ var World = new Class({
          */
         this.autoUpdate = GetValue(config, 'autoUpdate', true);
 
+        var debugConfig = GetValue(config, 'debug', false);
+
+        var drawDebug = (typeof(debugConfig) === 'object');
+
+        //  Legacy version
+        if (typeof(debugConfig) === 'boolean')
+        {
+            drawDebug = debugConfig;
+
+            var wireframes = GetFastValue(config, 'debugWireframes', true);
+
+            //  Old format config - remove in a later version
+            debugConfig = {
+                showBody: GetFastValue(config, 'debugShowBody', true),
+                showStaticBody: GetFastValue(config, 'debugShowStaticBody', true),
+                showSleeping: GetFastValue(config, 'debugShowSleeping', false),
+                showJoint: GetFastValue(config, 'debugShowJoint', true),
+                showInternalEdges: GetFastValue(config, 'debugShowInternalEdges', false),
+                showConvexHulls: GetFastValue(config, 'debugShowConvexHulls', false),
+
+                renderFill: !wireframes,
+                renderStroke: wireframes,
+
+                fillColor: GetFastValue(config, 'debugBodyFillColor', 0xe3a7e3),
+                strokeColor: GetFastValue(config, 'debugBodyColor', 0xff00ff),
+    
+                staticFillColor: GetFastValue(config, 'debugStaticBodyColor', 0x0000ff),
+                staticStrokeColor: GetFastValue(config, 'debugStaticBodyColor', 0x0000ff),
+    
+                staticBodySleepOpacity: 0.5,
+    
+                jointColor: GetFastValue(config, 'debugJointColor', 0x000000),
+                hullColor: GetFastValue(config, 'debugConvexHullColor', 0xaaaaaa)
+            };
+        }
+
         /**
-         * [description]
+         * A flag that controls if the debug graphics will be drawn to or not.
          *
          * @name Phaser.Physics.Matter.World#drawDebug
          * @type {boolean}
          * @default false
          * @since 3.0.0
          */
-        this.drawDebug = GetValue(config, 'debug', false);
+        this.drawDebug = drawDebug;
 
         /**
-         * [description]
+         * An instance of the Graphics object the debug bodies are drawn to, if enabled.
          *
          * @name Phaser.Physics.Matter.World#debugGraphic
          * @type {Phaser.GameObjects.Graphics}
@@ -194,21 +232,46 @@ var World = new Class({
         this.debugGraphic;
 
         /**
-         * [description]
+         * The debug configuration object.
          *
-         * @name Phaser.Physics.Matter.World#defaults
-         * @type {object}
-         * @since 3.0.0
+         * @name Phaser.Physics.Matter.World#debugConfig
+         * @type {Phaser.Types.Physics.Matter.MatterDebugConfig}
+         * @since 3.22.0
          */
-        this.defaults = {
-            debugShowBody: GetValue(config, 'debugShowBody', true),
-            debugShowStaticBody: GetValue(config, 'debugShowStaticBody', true),
-            debugShowVelocity: GetValue(config, 'debugShowVelocity', true),
-            bodyDebugColor: GetValue(config, 'debugBodyColor', 0xff00ff),
-            staticBodyDebugColor: GetValue(config, 'debugBodyColor', 0x0000ff),
-            velocityDebugColor: GetValue(config, 'debugVelocityColor', 0x00ff00),
-            debugShowJoint: GetValue(config, 'debugShowJoint', true),
-            jointDebugColor: GetValue(config, 'debugJointColor', 0x000000)
+        this.debugConfig = {
+            showBody: GetFastValue(debugConfig, 'showBody', true),
+            showStaticBody: GetFastValue(debugConfig, 'showStaticBody', true),
+            showSleeping: GetFastValue(debugConfig, 'showSleeping', false),
+            showJoint: GetFastValue(debugConfig, 'showJoint', true),
+            showInternalEdges: GetFastValue(debugConfig, 'showInternalEdges', false),
+            showConvexHulls: GetFastValue(debugConfig, 'showConvexHulls', false),
+
+            renderFill: GetFastValue(debugConfig, 'renderFill', true),
+            renderStroke: GetFastValue(debugConfig, 'renderStroke', true),
+            lineThickness: GetFastValue(debugConfig, 'lineThickness', 1),
+
+            fillColor: GetFastValue(debugConfig, 'fillColor', 0x106909),
+            strokeColor: GetFastValue(debugConfig, 'strokeColor', 0x28de19),
+
+            staticFillColor: GetFastValue(debugConfig, 'staticFillColor', 0x0d177b),
+            staticStrokeColor: GetFastValue(debugConfig, 'staticStrokeColor', 0x1327e4),
+
+            staticBodySleepOpacity: GetFastValue(debugConfig, 'staticBodySleepOpacity', 0.7),
+            sleepFillColor: GetFastValue(debugConfig, 'sleepFillColor', 0x464646),
+            sleepStrokeColor: GetFastValue(debugConfig, 'sleepStrokeColor', 0x999a99),
+
+            jointColor: GetFastValue(debugConfig, 'jointColor', 0xe0e042),
+            jointLineThickness: GetFastValue(debugConfig, 'jointLineThickness', 2),
+
+            pinSize: GetFastValue(debugConfig, 'pinSize', 4),
+            pinColor: GetFastValue(debugConfig, 'pinColor', 0x42e0e0),
+
+            springColor: GetFastValue(debugConfig, 'springColor', 0xe042e0),
+
+            anchorColor: GetFastValue(debugConfig, 'anchorColor', 0xefefef),
+            anchorSize: GetFastValue(debugConfig, 'anchorSize', 6),
+
+            hullColor: GetFastValue(debugConfig, 'hullColor', 0xd703d0)
         };
 
         if (this.drawDebug)
@@ -232,12 +295,12 @@ var World = new Class({
 
         MatterEvents.on(engine, 'beforeUpdate', function (event)
         {
-            _this.emit('beforeupdate', event);
+            _this.emit(Events.BEFORE_UPDATE, event);
         });
 
         MatterEvents.on(engine, 'afterUpdate', function (event)
         {
-            _this.emit('afterupdate', event);
+            _this.emit(Events.AFTER_UPDATE, event);
         });
 
         MatterEvents.on(engine, 'collisionStart', function (event)
@@ -252,7 +315,7 @@ var World = new Class({
                 bodyB = pairs[0].bodyB;
             }
 
-            _this.emit('collisionstart', event, bodyA, bodyB);
+            _this.emit(Events.COLLISION_START, event, bodyA, bodyB);
         });
 
         MatterEvents.on(engine, 'collisionActive', function (event)
@@ -267,7 +330,7 @@ var World = new Class({
                 bodyB = pairs[0].bodyB;
             }
 
-            _this.emit('collisionactive', event, bodyA, bodyB);
+            _this.emit(Events.COLLISION_ACTIVE, event, bodyA, bodyB);
         });
 
         MatterEvents.on(engine, 'collisionEnd', function (event)
@@ -282,7 +345,7 @@ var World = new Class({
                 bodyB = pairs[0].bodyB;
             }
 
-            _this.emit('collisionend', event, bodyA, bodyB);
+            _this.emit(Events.COLLISION_END, event, bodyA, bodyB);
         });
     },
 
@@ -313,16 +376,16 @@ var World = new Class({
     {
         if (x === undefined) { x = 0; }
         if (y === undefined) { y = 0; }
-        if (width === undefined) { width = this.scene.sys.game.config.width; }
-        if (height === undefined) { height = this.scene.sys.game.config.height; }
+        if (width === undefined) { width = this.scene.sys.scale.width; }
+        if (height === undefined) { height = this.scene.sys.scale.height; }
         if (thickness === undefined) { thickness = 128; }
         if (left === undefined) { left = true; }
         if (right === undefined) { right = true; }
         if (top === undefined) { top = true; }
         if (bottom === undefined) { bottom = true; }
 
-        this.updateWall(left, 'left', x - thickness, y, thickness, height);
-        this.updateWall(right, 'right', x + width, y, thickness, height);
+        this.updateWall(left, 'left', x - thickness, y - thickness, thickness, height + (thickness * 2));
+        this.updateWall(right, 'right', x + width, y - thickness, thickness, height + (thickness * 2));
         this.updateWall(top, 'top', x, y - thickness, width, thickness);
         this.updateWall(bottom, 'bottom', x, y + height, width, thickness);
 
@@ -393,7 +456,7 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Sets the world's gravity and gravity scale to 0.
      *
      * @method Phaser.Physics.Matter.World#disableGravity
      * @since 3.0.0
@@ -410,13 +473,13 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Sets the world's gravity
      *
      * @method Phaser.Physics.Matter.World#setGravity
      * @since 3.0.0
      *
-     * @param {number} [x=0] - [description]
-     * @param {number} [y=1] - [description]
+     * @param {number} [x=0] - The world gravity x component.
+     * @param {number} [y=1] - The world gravity y component.
      * @param {number} [scale] - [description]
      *
      * @return {Phaser.Physics.Matter.World} This Matter World object.
@@ -438,18 +501,18 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Creates a rectangle Matter body and adds it to the world.
      *
      * @method Phaser.Physics.Matter.World#create
      * @since 3.0.0
      *
-     * @param {number} x - [description]
-     * @param {number} y - [description]
-     * @param {number} width - [description]
-     * @param {number} height - [description]
-     * @param {object} options - [description]
+     * @param {number} x - The horizontal position of the body in the world.
+     * @param {number} y - The vertical position of the body in the world.
+     * @param {number} width - The width of the body.
+     * @param {number} height - The height of the body.
+     * @param {object} options - Optional Matter configuration object.
      *
-     * @return {MatterJS.Body} [description]
+     * @return {MatterJS.Body} The Matter.js body that was created.
      */
     create: function (x, y, width, height, options)
     {
@@ -461,7 +524,7 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Adds an object to the world.
      *
      * @method Phaser.Physics.Matter.World#add
      * @since 3.0.0
@@ -492,7 +555,7 @@ var World = new Class({
     {
         var body = (object.body) ? object.body : object;
 
-        Composite.removeBody(this.localWorld, body, deep);
+        Composite.remove(this.localWorld, body, deep);
 
         return this;
     },
@@ -531,7 +594,7 @@ var World = new Class({
     convertTilemapLayer: function (tilemapLayer, options)
     {
         var layerData = tilemapLayer.layer;
-        var tiles = tilemapLayer.getTilesWithin(0, 0, layerData.width, layerData.height, {isColliding: true});
+        var tiles = tilemapLayer.getTilesWithin(0, 0, layerData.width, layerData.height, { isColliding: true });
 
         this.convertTiles(tiles, options);
 
@@ -586,7 +649,7 @@ var World = new Class({
      * @method Phaser.Physics.Matter.World#nextCategory
      * @since 3.0.0
      *
-     * @return {number} [description]
+     * @return {number} Returns the next unique category bitfield.
      */
     nextCategory: function ()
     {
@@ -597,6 +660,7 @@ var World = new Class({
      * [description]
      *
      * @method Phaser.Physics.Matter.World#pause
+     * @fires Phaser.Physics.Matter.Events#PAUSE
      * @since 3.0.0
      *
      * @return {Phaser.Physics.Matter.World} This Matter World object.
@@ -605,7 +669,7 @@ var World = new Class({
     {
         this.enabled = false;
 
-        this.emit('pause');
+        this.emit(Events.PAUSE);
 
         return this;
     },
@@ -614,6 +678,7 @@ var World = new Class({
      * [description]
      *
      * @method Phaser.Physics.Matter.World#resume
+     * @fires Phaser.Physics.Matter.Events#RESUME
      * @since 3.0.0
      *
      * @return {Phaser.Physics.Matter.World} This Matter World object.
@@ -622,7 +687,7 @@ var World = new Class({
     {
         this.enabled = true;
 
-        this.emit('resume');
+        this.emit(Events.RESUME);
 
         return this;
     },
@@ -633,8 +698,8 @@ var World = new Class({
      * @method Phaser.Physics.Matter.World#update
      * @since 3.0.0
      *
-     * @param {number} time - [description]
-     * @param {number} delta - [description]
+     * @param {number} time - The current time. Either a High Resolution Timer value if it comes from Request Animation Frame, or Date.now if using SetTimeout.
+     * @param {number} delta - The delta time in ms since the last frame. This is a smoothed and capped value based on the FPS rate.
      */
     update: function (time, delta)
     {
@@ -703,149 +768,432 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Handles the rendering of bodies and debug information to the debug Graphics object, if enabled.
      *
      * @method Phaser.Physics.Matter.World#postUpdate
+     * @private
      * @since 3.0.0
      */
     postUpdate: function ()
     {
-        if (!this.drawDebug)
+        var config = this.debugConfig;
+
+        var showBody = config.showBody;
+        var showStaticBody = config.showStaticBody;
+        var showJoint = config.showJoint;
+
+        if (!this.drawDebug || (!showBody && !showStaticBody && !showJoint))
         {
             return;
         }
 
-        var graphics = this.debugGraphic;
+        this.debugGraphic.clear();
+
         var bodies = Composite.allBodies(this.localWorld);
 
-        graphics.clear();
-        graphics.lineStyle(1, this.defaults.bodyDebugColor);
-        graphics.beginPath();
+        this.renderBodies(bodies);
 
-        var i,j;
-
-        for (i = 0; i < bodies.length; i++)
+        if (showJoint)
         {
-            if (!bodies[i].render.visible)
+            this.renderJoints();
+        }
+    },
+
+    /**
+     * Renders the given array of Bodies to the debug graphics instance.
+     * 
+     * Called automatically by the `postUpdate` method.
+     *
+     * @method Phaser.Physics.Matter.World#renderBodies
+     * @private
+     * @since 3.14.0
+     * 
+     * @param {array} bodies - An array of bodies from the localWorld.
+     */
+    renderBodies: function (bodies)
+    {
+        var graphics = this.debugGraphic;
+
+        var config = this.debugConfig;
+
+        var showBody = config.showBody;
+        var showStaticBody = config.showStaticBody;
+        var showSleeping = config.showSleeping;
+        var showInternalEdges = config.showInternalEdges;
+        var showConvexHulls = config.showConvexHulls;
+
+        var renderFill = config.renderFill;
+        var renderStroke = config.renderStroke;
+
+        var fillColor = config.fillColor;
+        var strokeColor = config.strokeColor;
+        var lineThickness = config.lineThickness;
+
+        var staticFillColor = config.staticFillColor;
+        var staticStrokeColor = config.staticStrokeColor;
+
+        var staticBodySleepOpacity = config.staticBodySleepOpacity;
+        var sleepFillColor = config.sleepFillColor;
+        var sleepStrokeColor = config.sleepStrokeColor;
+
+        var hullColor = config.hullColor;
+
+        for (var i = 0; i < bodies.length; i++)
+        {
+            var body = bodies[i];
+
+            //  1) Don't show invisible bodies
+            if (!body.render.visible)
             {
-                return;
+                continue;
             }
 
-            // Handle drawing both single bodies and compound bodies. If compound, draw both the
-            // convex hull (first part) and the rest of the bodies.
-            for (j = 0; j < bodies[i].parts.length; j++)
+            //  2) Don't show static bodies, OR
+            //  3) Don't show dynamic bodies
+            if ((!showStaticBody && body.isStatic) || (!showBody && !body.isStatic))
             {
-                var body = bodies[i].parts[j];
+                continue;
+            }
 
-                var vertices = body.vertices;
+            var opacity = body.render.opacity;
+            var lineStyle = strokeColor;
+            var fillStyle = fillColor;
 
+            if (showSleeping && body.isSleeping)
+            {
+                if (body.isStatic)
+                {
+                    opacity *= staticBodySleepOpacity;
+                }
+                else
+                {
+                    lineStyle = sleepStrokeColor;
+                    fillStyle = sleepFillColor;
+                }
+            }
+
+            if (body.isStatic)
+            {
+                lineStyle = staticStrokeColor;
+                fillStyle = staticFillColor;
+            }
+
+            if (!renderFill)
+            {
+                fillStyle = null;
+            }
+
+            if (!renderStroke)
+            {
+                lineStyle = null;
+            }
+
+            this.renderBody(body, graphics, showInternalEdges, lineStyle, fillStyle, opacity, lineThickness);
+
+            var partsLength = body.parts.length;
+
+            if (showConvexHulls && partsLength > 1)
+            {
+                this.renderConvexHull(body, graphics, hullColor, lineThickness);
+            }
+        }
+    },
+
+    /**
+     * Renders a single Matter Body to the given Phaser Graphics Game Object.
+     * 
+     * This method is used internally by the Matter Debug Renderer, but is also exposed publically should
+     * you wish to render a Body to your own Graphics instance.
+     * 
+     * @method Phaser.Physics.Matter.World#renderBody
+     * @since 3.22.0
+     * 
+     * @param {MatterJS.Body} body - The Matter Body to be rendered.
+     * @param {Phaser.GameObjects.Graphics} graphics - The Graphics object to render to.
+     * @param {boolean} showInternalEdges - Render internal edges of the polygon?
+     * @param {number} [lineColor] - The stroke color. Set to `null` if you don't want to render a stroke.
+     * @param {number} [fillColor] - The fill color. Set to `null` if you don't want to render a fill.
+     * @param {number} [opacity] - The opacity, between 0 and 1. Set to `null` if you want to use the opacity defined in the Body render object.
+     * @param {number} [lineThickness=1] - The stroke line thickness.
+     * 
+     * @return {this} This Matter World instance for method chaining.
+     */
+    renderBody: function (body, graphics, showInternalEdges, lineColor, fillColor, opacity, lineThickness)
+    {
+        if (lineColor === undefined) { lineColor = null; }
+        if (fillColor === undefined) { fillColor = null; }
+        if (opacity === undefined) { opacity = null; }
+        if (lineThickness === undefined) { lineThickness = 1; }
+
+        var usePartOpacity = !opacity;
+
+        //  Handle compound parts
+        var parts = body.parts;
+        var partsLength = parts.length;
+
+        for (var k = (partsLength > 1) ? 1 : 0; k < partsLength; k++)
+        {
+            var part = parts[k];
+            var render = part.render;
+
+            if (usePartOpacity)
+            {
+                opacity = render.opacity;
+            }
+
+            if (!render.visible || opacity === 0)
+            {
+                continue;
+            }
+
+            //  Part polygon
+            var circleRadius = part.circleRadius;
+
+            if (circleRadius)
+            {
+                graphics.beginPath();
+                graphics.arc(part.position.x, part.position.y, circleRadius, 0, 2 * Math.PI);
+            }
+            else
+            {
+                var vertices = part.vertices;
+                var vertLength = vertices.length;
+
+                graphics.beginPath();
                 graphics.moveTo(vertices[0].x, vertices[0].y);
 
-                for (var k = 1; k < vertices.length; k++)
+                for (var j = 1; j < vertLength; j++)
                 {
-                    graphics.lineTo(vertices[k].x, vertices[k].y);
+                    var vert = vertices[j];
+
+                    if (!vertices[j - 1].isInternal || showInternalEdges)
+                    {
+                        graphics.lineTo(vert.x, vert.y);
+                    }
+                    else
+                    {
+                        graphics.moveTo(vert.x, vert.y);
+                    }
+
+                    if (vert.isInternal && !showInternalEdges)
+                    {
+                        var nextIndex = (j + 1) % vertLength;
+
+                        graphics.moveTo(vertices[nextIndex].x, vertices[nextIndex].y);
+                    }
                 }
+                
+                graphics.closePath();
+            }
 
-                graphics.lineTo(vertices[0].x, vertices[0].y);
+            if (fillColor !== null)
+            {
+                graphics.fillStyle(fillColor, opacity);
+                graphics.fillPath();
+            }
 
+            if (lineColor !== null)
+            {
+                graphics.lineStyle(lineThickness, lineColor, opacity);
                 graphics.strokePath();
             }
         }
 
-        graphics.closePath();
+        return this;
+    },
 
-        if (this.defaults.debugShowJoint)
+    /**
+     * Renders the Convex Hull for a single Matter Body to the given Phaser Graphics Game Object.
+     * 
+     * This method is used internally by the Matter Debug Renderer, but is also exposed publically should
+     * you wish to render a Body hull to your own Graphics instance.
+     * 
+     * @method Phaser.Physics.Matter.World#renderConvexHull
+     * @since 3.22.0
+     * 
+     * @param {MatterJS.Body} body - The Matter Body to be rendered.
+     * @param {Phaser.GameObjects.Graphics} graphics - The Graphics object to render to.
+     * @param {number} hullColor - The stroke color used to render the hull.
+     * @param {number} [lineThickness=1] - The stroke line thickness.
+     * 
+     * @return {this} This Matter World instance for method chaining.
+     */
+    renderConvexHull: function (body, graphics, hullColor, lineThickness)
+    {
+        if (lineThickness === undefined) { lineThickness = 1; }
+
+        var parts = body.parts;
+        var partsLength = parts.length;
+
+        //  Render Convex Hulls
+        if (partsLength > 1)
         {
-            graphics.lineStyle(2, this.defaults.jointDebugColor);
+            var verts = body.vertices;
 
-            // Render constraints 
-            var constraints = Composite.allConstraints(this.localWorld);
+            graphics.lineStyle(lineThickness, hullColor);
 
-            for (i = 0; i < constraints.length; i++)
+            graphics.beginPath();
+
+            graphics.moveTo(verts[0].x, verts[0].y);
+
+            for (var v = 1; v < verts.length; v++)
             {
-                var constraint = constraints[i];
+                graphics.lineTo(verts[v].x, verts[v].y);
+            }
+            
+            graphics.lineTo(verts[0].x, verts[0].y);
 
-                if (!constraint.render.visible || !constraint.pointA || !constraint.pointB)
+            graphics.strokePath();
+        }
+
+        return this;
+    },
+
+    /**
+     * Renders all of the constraints in the world (unless they are specifically set to invisible).
+     * 
+     * Called automatically by the `postUpdate` method.
+     *
+     * @method Phaser.Physics.Matter.World#renderJoints
+     * @private
+     * @since 3.14.0
+     */
+    renderJoints: function ()
+    {
+        var graphics = this.debugGraphic;
+        var config = this.debugConfig;
+
+        var jointColor = config.jointColor;
+        var jointLineThickness = config.jointLineThickness;
+        var pinSize = config.pinSize;
+        var pinColor = config.pinColor;
+        var springColor = config.springColor;
+        var anchorColor = config.anchorColor;
+        var anchorSize = config.anchorSize;
+
+        // Render constraints 
+        var constraints = Composite.allConstraints(this.localWorld);
+
+        for (var i = 0; i < constraints.length; i++)
+        {
+            this.renderConstraint(constraints[i], graphics, jointColor, jointLineThickness, springColor, pinColor, pinSize, anchorColor, anchorSize);
+        }
+    },
+
+    /**
+     * Renders a single Matter Constraint, such as a Pin or a Spring, to the given Phaser Graphics Game Object.
+     * 
+     * This method is used internally by the Matter Debug Renderer, but is also exposed publically should
+     * you wish to render a Constraint to your own Graphics instance.
+     * 
+     * @method Phaser.Physics.Matter.World#renderConstraint
+     * @since 3.22.0
+     * 
+     * @param {MatterJS.Constraint} constraint - The Matter Constraint to render.
+     * @param {Phaser.GameObjects.Graphics} graphics - The Graphics object to render to.
+     * @param {number} lineColor - The line color used when rendering this constraint.
+     * @param {number} lineThickness - The line thickness.
+     * @param {number} springColor - The color used when rendering, if this constraint is a spring.
+     * @param {number} pinColor - The color used when rendering, if this constraint is a pin.
+     * @param {number} pinSize - If this constraint is a pin, this sets the size of the pin circle.
+     * @param {number} anchorColor - The color used when rendering this constraints anchors. Set to `null` to not render anchors.
+     * @param {number} anchorSize - The size of the anchor circle, if this constraint has anchors and is rendering them.
+     * 
+     * @return {this} This Matter World instance for method chaining.
+     */
+    renderConstraint: function (constraint, graphics, lineColor, lineThickness, springColor, pinColor, pinSize, anchorColor, anchorSize)
+    {
+        var render = constraint.render;
+
+        if (!render.visible || !constraint.pointA || !constraint.pointB)
+        {
+            return this;
+        }
+
+        var custom = render.custom;
+
+        if (custom)
+        {
+            graphics.lineStyle(render.lineWidth, Common.colorToNumber(render.strokeStyle));
+        }
+        else
+        {
+            graphics.lineStyle(lineThickness, lineColor);
+        }
+
+        var bodyA = constraint.bodyA;
+        var bodyB = constraint.bodyB;
+        var start;
+        var end;
+
+        if (bodyA)
+        {
+            start = Vector.add(bodyA.position, constraint.pointA);
+        }
+        else
+        {
+            start = constraint.pointA;
+        }
+
+        if (render.type === 'pin')
+        {
+            if (!custom)
+            {
+                graphics.lineStyle(lineThickness, pinColor);
+            }
+
+            graphics.strokeCircle(start.x, start.y, pinSize);
+        }
+        else
+        {
+            if (bodyB)
+            {
+                end = Vector.add(bodyB.position, constraint.pointB);
+            }
+            else
+            {
+                end = constraint.pointB;
+            }
+
+            graphics.beginPath();
+            graphics.moveTo(start.x, start.y);
+
+            if (render.type === 'spring')
+            {
+                if (!custom)
                 {
-                    continue;
+                    graphics.lineStyle(lineThickness, springColor);
                 }
 
-                if (constraint.render.lineWidth)
+                var delta = Vector.sub(end, start);
+                var normal = Vector.perp(Vector.normalise(delta));
+                var coils = Math.ceil(Common.clamp(constraint.length / 5, 12, 20));
+                var offset;
+
+                for (var j = 1; j < coils; j += 1)
                 {
-                    graphics.lineStyle(constraint.render.lineWidth, Common.colorToNumber(constraint.render.strokeStyle));
-                }
+                    offset = (j % 2 === 0) ? 1 : -1;
 
-                var bodyA = constraint.bodyA;
-                var bodyB = constraint.bodyB;
-                var start;
-                var end;
-
-                if (bodyA)
-                {
-                    start = Vector.add(bodyA.position, constraint.pointA);
-                }
-                else
-                {
-                    start = constraint.pointA;
-                }
-
-                if (constraint.render.type === 'pin')
-                {
-                    graphics.beginPath();
-                    graphics.arc(start.x, start.y, 3, 0, 2 * Math.PI);
-                    graphics.closePath();
-                }
-                else
-                {
-                    if (bodyB)
-                    {
-                        end = Vector.add(bodyB.position, constraint.pointB);
-                    }
-                    else
-                    {
-                        end = constraint.pointB;
-                    }
-
-                    graphics.beginPath();
-                    graphics.moveTo(start.x, start.y);
-
-                    if (constraint.render.type === 'spring')
-                    {
-                        var delta = Vector.sub(end, start);
-                        var normal = Vector.perp(Vector.normalise(delta));
-                        var coils = Math.ceil(Common.clamp(constraint.length / 5, 12, 20));
-                        var offset;
-
-                        for (j = 1; j < coils; j += 1)
-                        {
-                            offset = (j % 2 === 0) ? 1 : -1;
-
-                            graphics.lineTo(
-                                start.x + delta.x * (j / coils) + normal.x * offset * 4,
-                                start.y + delta.y * (j / coils) + normal.y * offset * 4
-                            );
-                        }
-                    }
-
-                    graphics.lineTo(end.x, end.y);
-                }
-
-                if (constraint.render.lineWidth)
-                {
-                    graphics.strokePath();
-                }
-
-                if (constraint.render.anchors)
-                {
-                    graphics.fillStyle(Common.colorToNumber(constraint.render.strokeStyle));
-                    graphics.beginPath();
-                    graphics.arc(start.x, start.y, 6, 0, 2 * Math.PI);
-                    graphics.arc(end.x, end.y, 6, 0, 2 * Math.PI);
-                    graphics.closePath();
-                    graphics.fillPath();
+                    graphics.lineTo(
+                        start.x + delta.x * (j / coils) + normal.x * offset * 4,
+                        start.y + delta.y * (j / coils) + normal.y * offset * 4
+                    );
                 }
             }
+
+            graphics.lineTo(end.x, end.y);
         }
+
+        graphics.strokePath();
+
+        if (render.anchors && anchorSize > 0)
+        {
+            graphics.fillStyle(anchorColor);
+            graphics.fillCircle(start.x, start.y, anchorSize);
+            graphics.fillCircle(end.x, end.y, anchorSize);
+        }
+
+        return this;
     },
 
     /**
@@ -877,7 +1225,28 @@ var World = new Class({
     },
 
     /**
-     * [description]
+     * Resets the internal collision IDs that Matter.JS uses for Body collision groups.
+     * 
+     * You should call this before destroying your game if you need to restart the game
+     * again on the same page, without first reloading the page. Or, if you wish to
+     * consistently destroy a Scene that contains Matter.js and then run it again
+     * later in the same game.
+     *
+     * @method Phaser.Physics.Matter.World#resetCollisionIDs
+     * @since 3.17.0
+     */
+    resetCollisionIDs: function ()
+    {
+        Body._nextCollidingGroupId = 1;
+        Body._nextNonCollidingGroupId = -1;
+        Body._nextCategory = 0x0001;
+
+        return this;
+    },
+
+    /**
+     * Will remove all Matter physics event listeners and clear the matter physics world,
+     * engine and any debug graphics, if any.
      *
      * @method Phaser.Physics.Matter.World#shutdown
      * @since 3.0.0
@@ -891,10 +1260,18 @@ var World = new Class({
         MatterWorld.clear(this.localWorld, false);
 
         Engine.clear(this.engine);
+
+        if (this.drawDebug)
+        {
+            this.debugGraphic.destroy();
+        }
     },
 
     /**
-     * [description]
+     * Will remove all Matter physics event listeners and clear the matter physics world,
+     * engine and any debug graphics, if any.
+     *
+     * After destroying the world it cannot be re-used again.
      *
      * @method Phaser.Physics.Matter.World#destroy
      * @since 3.0.0

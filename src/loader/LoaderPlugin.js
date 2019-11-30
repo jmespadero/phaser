@@ -1,16 +1,18 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../utils/Class');
 var CONST = require('./const');
 var CustomSet = require('../structs/Set');
 var EventEmitter = require('eventemitter3');
+var Events = require('./events');
 var FileTypesManager = require('./FileTypesManager');
 var GetFastValue = require('../utils/object/GetFastValue');
 var PluginCache = require('../plugins/PluginCache');
+var SceneEvents = require('../scene/events');
 var XHRSettings = require('./XHRSettings');
 
 /**
@@ -41,7 +43,7 @@ var XHRSettings = require('./XHRSettings');
  *
  * @class LoaderPlugin
  * @extends Phaser.Events.EventEmitter
- * @memberOf Phaser.Loader
+ * @memberof Phaser.Loader
  * @constructor
  * @since 3.0.0
  *
@@ -65,7 +67,6 @@ var LoaderPlugin = new Class({
          *
          * @name Phaser.Loader.LoaderPlugin#scene
          * @type {Phaser.Scene}
-         * @protected
          * @since 3.0.0
          */
         this.scene = scene;
@@ -75,7 +76,6 @@ var LoaderPlugin = new Class({
          *
          * @name Phaser.Loader.LoaderPlugin#systems
          * @type {Phaser.Scenes.Systems}
-         * @protected
          * @since 3.0.0
          */
         this.systems = scene.sys;
@@ -85,7 +85,6 @@ var LoaderPlugin = new Class({
          *
          * @name Phaser.Loader.LoaderPlugin#cacheManager
          * @type {Phaser.Cache.CacheManager}
-         * @protected
          * @since 3.7.0
          */
         this.cacheManager = scene.sys.cache;
@@ -95,10 +94,19 @@ var LoaderPlugin = new Class({
          *
          * @name Phaser.Loader.LoaderPlugin#textureManager
          * @type {Phaser.Textures.TextureManager}
-         * @protected
          * @since 3.7.0
          */
         this.textureManager = scene.sys.textures;
+
+        /**
+         * A reference to the global Scene Manager.
+         *
+         * @name Phaser.Loader.LoaderPlugin#sceneManager
+         * @type {Phaser.Scenes.SceneManager}
+         * @protected
+         * @since 3.16.0
+         */
+        this.sceneManager = scene.sys.game.scene;
 
         //  Inject the available filetypes into the Loader
         FileTypesManager.install(this);
@@ -178,7 +186,7 @@ var LoaderPlugin = new Class({
          * xhr specific global settings (can be overridden on a per-file basis)
          *
          * @name Phaser.Loader.LoaderPlugin#xhr
-         * @type {XHRSettingsObject}
+         * @type {Phaser.Types.Loader.XHRSettingsObject}
          * @since 3.0.0
          */
         this.xhr = XHRSettings(
@@ -215,7 +223,7 @@ var LoaderPlugin = new Class({
          * Note that it is possible for this value to go down again if you add content to the current load queue during a load.
          *
          * @name Phaser.Loader.LoaderPlugin#progress
-         * @type {float}
+         * @type {number}
          * @default 0
          * @since 3.0.0
          */
@@ -300,13 +308,23 @@ var LoaderPlugin = new Class({
          *
          * @name Phaser.Loader.LoaderPlugin#state
          * @type {integer}
-         * @readOnly
+         * @readonly
          * @since 3.0.0
          */
         this.state = CONST.LOADER_IDLE;
 
-        scene.sys.events.once('boot', this.boot, this);
-        scene.sys.events.on('start', this.pluginStart, this);
+        /**
+         * The current index being used by multi-file loaders to avoid key clashes.
+         *
+         * @name Phaser.Loader.LoaderPlugin#multiKeyIndex
+         * @type {integer}
+         * @private
+         * @since 3.20.0
+         */
+        this.multiKeyIndex = 0;
+
+        scene.sys.events.once(SceneEvents.BOOT, this.boot, this);
+        scene.sys.events.on(SceneEvents.START, this.pluginStart, this);
     },
 
     /**
@@ -319,7 +337,7 @@ var LoaderPlugin = new Class({
      */
     boot: function ()
     {
-        this.systems.events.once('destroy', this.destroy, this);
+        this.systems.events.once(SceneEvents.DESTROY, this.destroy, this);
     },
 
     /**
@@ -333,7 +351,7 @@ var LoaderPlugin = new Class({
      */
     pluginStart: function ()
     {
-        this.systems.events.once('shutdown', this.shutdown, this);
+        this.systems.events.once(SceneEvents.SHUTDOWN, this.shutdown, this);
     },
 
     /**
@@ -454,16 +472,6 @@ var LoaderPlugin = new Class({
     },
 
     /**
-     * This event is fired when a Loader successfully begins to load its queue.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#addFileEvent
-     * @param {string} key - The key of the file that was added.
-     * @param {string} type - The type of the file that was added.
-     * @param {Phaser.Loader.LoaderPlugin} loader - The Loader that had the file added to it.
-     * @param {Phaser.Loader.File} loader - The File object that was added to the Loader.
-     */
-
-    /**
      * Adds a file, or array of files, into the load queue.
      *
      * The file must be an instance of `Phaser.Loader.File`, or a class that extends it. The Loader will check that the key
@@ -475,7 +483,7 @@ var LoaderPlugin = new Class({
      * however you can call this as long as the file given to it is well formed.
      *
      * @method Phaser.Loader.LoaderPlugin#addFile
-     * @fires Phaser.Loader.LoaderPlugin#addFileEvent
+     * @fires Phaser.Loader.Events#ADD
      * @since 3.0.0
      *
      * @param {(Phaser.Loader.File|Phaser.Loader.File[])} file - The file, or array of files, to be added to the load queue.
@@ -497,7 +505,7 @@ var LoaderPlugin = new Class({
             {
                 this.list.set(item);
 
-                this.emit('addfile', item.key, item.type, this, item);
+                this.emit(Events.ADD, item.key, item.type, this, item);
 
                 if (this.isLoading())
                 {
@@ -664,13 +672,6 @@ var LoaderPlugin = new Class({
     },
 
     /**
-     * This event is fired when a Loader successfully begins to load its queue.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#startEvent
-     * @param {Phaser.Loader.LoaderPlugin} loader - The Loader instance that started.
-     */
-
-    /**
      * Starts the Loader running. This will reset the progress and totals and then emit a `start` event.
      * If there is nothing in the queue the Loader will immediately complete, otherwise it will start
      * loading the first batch of files.
@@ -682,7 +683,7 @@ var LoaderPlugin = new Class({
      * If the Loader is already running this method will simply return.
      *
      * @method Phaser.Loader.LoaderPlugin#start
-     * @fires Phaser.Loader.LoaderPlugin#startEvent
+     * @fires Phaser.Loader.Events#START
      * @since 3.0.0
      */
     start: function ()
@@ -698,7 +699,7 @@ var LoaderPlugin = new Class({
         this.totalComplete = 0;
         this.totalToLoad = this.list.size;
 
-        this.emit('start', this);
+        this.emit(Events.START, this);
 
         if (this.list.size === 0)
         {
@@ -714,16 +715,10 @@ var LoaderPlugin = new Class({
             this.updateProgress();
 
             this.checkLoadQueue();
+
+            this.systems.events.on(SceneEvents.UPDATE, this.update, this);
         }
     },
-
-    /**
-     * This event is fired when the Loader updates its progress, typically as a result of
-     * a file having completed loading.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#progressEvent
-     * @param {float} progress - The current progress of the load. A value between 0 and 1.
-     */
 
     /**
      * Called automatically during the load process.
@@ -731,14 +726,28 @@ var LoaderPlugin = new Class({
      * display a loading bar in your game.
      *
      * @method Phaser.Loader.LoaderPlugin#updateProgress
-     * @fires Phaser.Loader.LoaderPlugin#progressEvent
+     * @fires Phaser.Loader.Events#PROGRESS
      * @since 3.0.0
      */
     updateProgress: function ()
     {
         this.progress = 1 - ((this.list.size + this.inflight.size) / this.totalToLoad);
 
-        this.emit('progress', this.progress);
+        this.emit(Events.PROGRESS, this.progress);
+    },
+
+    /**
+     * Called automatically during the load process.
+     *
+     * @method Phaser.Loader.LoaderPlugin#update
+     * @since 3.10.0
+     */
+    update: function ()
+    {
+        if (this.state === CONST.LOADER_LOADING && this.list.size > 0 && this.inflight.size < this.maxParallelDownloads)
+        {
+            this.checkLoadQueue();
+        }
     },
 
     /**
@@ -763,8 +772,7 @@ var LoaderPlugin = new Class({
 
                 this.list.delete(file);
 
-                //  If the file doesn't have its own crossOrigin set,
-                //  we'll use the Loaders (which is undefined by default)
+                //  If the file doesn't have its own crossOrigin set, we'll use the Loaders (which is undefined by default)
                 if (!file.crossOrigin)
                 {
                     file.crossOrigin = this.crossOrigin;
@@ -783,28 +791,14 @@ var LoaderPlugin = new Class({
     },
 
     /**
-     * This event is fired when the a file successfully completes loading, _before_ it is processed.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#loadEvent
-     * @param {Phaser.Loader.File} file - The file that has completed loading.
-     */
-
-    /**
-     * This event is fired when the a file errors during load.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#loadErrorEvent
-     * @param {Phaser.Loader.File} file - The file that has failed to load.
-     */
-
-    /**
      * An internal method called automatically by the XHRLoader belong to a File.
      * 
      * This method will remove the given file from the inflight Set and update the load progress.
      * If the file was successful its `onProcess` method is called, otherwise it is added to the delete queue.
      *
      * @method Phaser.Loader.LoaderPlugin#nextFile
-     * @fires Phaser.Loader.LoaderPlugin#loadEvent
-     * @fires Phaser.Loader.LoaderPlugin#loadErrorEvent
+     * @fires Phaser.Loader.Events#FILE_LOAD
+     * @fires Phaser.Loader.Events#FILE_LOAD_ERROR
      * @since 3.0.0
      *
      * @param {Phaser.Loader.File} file - The File that just finished loading, or errored during load.
@@ -812,6 +806,12 @@ var LoaderPlugin = new Class({
      */
     nextFile: function (file, success)
     {
+        //  Has the game been destroyed during load? If so, bail out now.
+        if (!this.inflight)
+        {
+            return;
+        }
+
         this.inflight.delete(file);
 
         this.updateProgress();
@@ -822,7 +822,7 @@ var LoaderPlugin = new Class({
 
             this.queue.set(file);
 
-            this.emit('load', file);
+            this.emit(Events.FILE_LOAD, file);
 
             file.onProcess();
         }
@@ -832,12 +832,9 @@ var LoaderPlugin = new Class({
 
             this._deleteQueue.set(file);
 
-            this.emit('loaderror', file);
-        }
+            this.emit(Events.FILE_LOAD_ERROR, file);
 
-        if (this.list.size > 0)
-        {
-            this.checkLoadQueue();
+            this.fileProcessComplete(file);
         }
     },
 
@@ -846,7 +843,7 @@ var LoaderPlugin = new Class({
      *
      * If the process was successful, and the File isn't part of a MultiFile, its `addToCache` method is called.
      *
-     * It this then removed from the queue. If there are more files to load, `checkLoadQueue` is called, otherwise `loadComplete` is.
+     * It this then removed from the queue. If there are no more files to load `loadComplete` is called.
      *
      * @method Phaser.Loader.LoaderPlugin#fileProcessComplete
      * @since 3.7.0
@@ -855,6 +852,12 @@ var LoaderPlugin = new Class({
      */
     fileProcessComplete: function (file)
     {
+        //  Has the game been destroyed during load? If so, bail out now.
+        if (!this.scene || !this.systems || !this.systems.game || this.systems.game.pendingDestroy)
+        {
+            return;
+        }
+
         //  This file has failed, so move it to the failed Set
         if (file.state === CONST.FILE_ERRORED)
         {
@@ -884,24 +887,12 @@ var LoaderPlugin = new Class({
         this.queue.delete(file);
 
         //  Nothing left to do?
+
         if (this.list.size === 0 && this.inflight.size === 0 && this.queue.size === 0)
         {
             this.loadComplete();
         }
-        else
-        {
-            //  In case we've added to the list by processing this file
-            this.checkLoadQueue();
-        }
     },
-
-    /**
-     * This event is fired when the Loader has finished loading everything and the queue is empty.
-     * By this point every loaded file will now be in its associated cache and ready for use.
-     * 
-     * @event Phaser.Loader.LoaderPlugin#completeEvent
-     * @param {Phaser.Loader.File} file - The file that has failed to load.
-     */
 
     /**
      * Called at the end when the load queue is exhausted and all files have either loaded or errored.
@@ -910,12 +901,13 @@ var LoaderPlugin = new Class({
      * Also clears down the Sets, puts progress to 1 and clears the deletion queue.
      *
      * @method Phaser.Loader.LoaderPlugin#loadComplete
-     * @fires Phaser.Loader.LoaderPlugin#completeEvent
+     * @fires Phaser.Loader.Events#COMPLETE
+     * @fires Phaser.Loader.Events#POST_PROCESS
      * @since 3.7.0
      */
     loadComplete: function ()
     {
-        this.emit('loadcomplete', this);
+        this.emit(Events.POST_PROCESS, this);
 
         this.list.clear();
         this.inflight.clear();
@@ -925,12 +917,14 @@ var LoaderPlugin = new Class({
 
         this.state = CONST.LOADER_COMPLETE;
 
+        this.systems.events.off(SceneEvents.UPDATE, this.update, this);
+
         //  Call 'destroy' on each file ready for deletion
         this._deleteQueue.iterateLocal('destroy');
 
         this._deleteQueue.clear();
 
-        this.emit('complete', this, this.totalComplete, this.totalFailed);
+        this.emit(Events.COMPLETE, this, this.totalComplete, this.totalFailed);
     },
 
     /**
@@ -1038,7 +1032,8 @@ var LoaderPlugin = new Class({
 
         this.state = CONST.LOADER_SHUTDOWN;
 
-        this.systems.events.off('shutdown', this.shutdown, this);
+        this.systems.events.off(SceneEvents.UPDATE, this.update, this);
+        this.systems.events.off(SceneEvents.SHUTDOWN, this.shutdown, this);
     },
 
     /**
@@ -1055,7 +1050,8 @@ var LoaderPlugin = new Class({
 
         this.state = CONST.LOADER_DESTROYED;
 
-        this.systems.events.off('start', this.pluginStart, this);
+        this.systems.events.off(SceneEvents.UPDATE, this.update, this);
+        this.systems.events.off(SceneEvents.START, this.pluginStart, this);
 
         this.list = null;
         this.inflight = null;
@@ -1065,6 +1061,7 @@ var LoaderPlugin = new Class({
         this.systems = null;
         this.textureManager = null;
         this.cacheManager = null;
+        this.sceneManager = null;
     }
 
 });

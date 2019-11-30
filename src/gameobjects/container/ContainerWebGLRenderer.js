@@ -1,11 +1,9 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
  * @author       Felipe Alfonso <@bitnenfer>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
-
-var GameObject = require('../GameObject');
 
 /**
  * Renders this Game Object with the WebGL Renderer to the given Camera.
@@ -24,19 +22,16 @@ var GameObject = require('../GameObject');
  */
 var ContainerWebGLRenderer = function (renderer, container, interpolationPercentage, camera, parentMatrix)
 {
-    if (GameObject.RENDER_MASK !== container.renderFlags || (container.cameraFilter > 0 && (container.cameraFilter & camera._id)))
+    var children = container.list;
+
+    if (children.length === 0)
     {
         return;
     }
 
-    var children = container.list;
     var transformMatrix = container.localTransform;
     
-    if (parentMatrix === undefined)
-    {
-        transformMatrix.applyITRS(container.x, container.y, container.rotation, container.scaleX, container.scaleY);
-    }
-    else
+    if (parentMatrix)
     {
         transformMatrix.loadIdentity();
         transformMatrix.multiply(parentMatrix);
@@ -44,23 +39,107 @@ var ContainerWebGLRenderer = function (renderer, container, interpolationPercent
         transformMatrix.rotate(container.rotation);
         transformMatrix.scale(container.scaleX, container.scaleY);
     }
+    else
+    {
+        transformMatrix.applyITRS(container.x, container.y, container.rotation, container.scaleX, container.scaleY);
+    }
 
-    var alpha = container._alpha;
+    var containerHasBlendMode = (container.blendMode !== -1);
+
+    if (!containerHasBlendMode)
+    {
+        //  If Container is SKIP_TEST then set blend mode to be Normal
+        renderer.setBlendMode(0);
+    }
+
+    var alphaTopLeft = container.alphaTopLeft;
+    var alphaTopRight = container.alphaTopRight;
+    var alphaBottomLeft = container.alphaBottomLeft;
+    var alphaBottomRight = container.alphaBottomRight;
+
     var scrollFactorX = container.scrollFactorX;
     var scrollFactorY = container.scrollFactorY;
 
-    for (var index = 0; index < children.length; ++index)
+    var list = children;
+    var childCount = children.length;
+
+    for (var i = 0; i < childCount; i++)
     {
-        var child = children[index];
-        var childAlpha = child._alpha;
+        var child = children[i];
+
+        if (!child.willRender(camera))
+        {
+            continue;
+        }
+
+        var childAlphaTopLeft;
+        var childAlphaTopRight;
+        var childAlphaBottomLeft;
+        var childAlphaBottomRight;
+
+        if (child.alphaTopLeft !== undefined)
+        {
+            childAlphaTopLeft = child.alphaTopLeft;
+            childAlphaTopRight = child.alphaTopRight;
+            childAlphaBottomLeft = child.alphaBottomLeft;
+            childAlphaBottomRight = child.alphaBottomRight;
+        }
+        else
+        {
+            var childAlpha = child.alpha;
+
+            childAlphaTopLeft = childAlpha;
+            childAlphaTopRight = childAlpha;
+            childAlphaBottomLeft = childAlpha;
+            childAlphaBottomRight = childAlpha;
+        }
+
         var childScrollFactorX = child.scrollFactorX;
         var childScrollFactorY = child.scrollFactorY;
 
+        if (!containerHasBlendMode && child.blendMode !== renderer.currentBlendMode)
+        {
+            //  If Container doesn't have its own blend mode, then a child can have one
+            renderer.setBlendMode(child.blendMode);
+        }
+
+        var mask = child.mask;
+
+        if (mask)
+        {
+            mask.preRenderWebGL(renderer, child, camera);
+        }
+
+        var type = child.type;
+
+        if (type !== renderer.currentType)
+        {
+            renderer.newType = true;
+            renderer.currentType = type;
+        }
+
+        renderer.nextTypeMatch = (i < childCount - 1) ? (list[i + 1].type === renderer.currentType) : false;
+
+        //  Set parent values
         child.setScrollFactor(childScrollFactorX * scrollFactorX, childScrollFactorY * scrollFactorY);
-        child.setAlpha(childAlpha * alpha);
+
+        child.setAlpha(childAlphaTopLeft * alphaTopLeft, childAlphaTopRight * alphaTopRight, childAlphaBottomLeft * alphaBottomLeft, childAlphaBottomRight * alphaBottomRight);
+
+        //  Render
         child.renderWebGL(renderer, child, interpolationPercentage, camera, transformMatrix);
-        child.setAlpha(childAlpha);
+
+        //  Restore original values
+
+        child.setAlpha(childAlphaTopLeft, childAlphaTopRight, childAlphaBottomLeft, childAlphaBottomRight);
+
         child.setScrollFactor(childScrollFactorX, childScrollFactorY);
+
+        if (mask)
+        {
+            mask.postRenderWebGL(renderer, camera);
+        }
+
+        renderer.newType = false;
     }
 };
 

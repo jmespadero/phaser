@@ -1,13 +1,15 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
  * @author       Felipe Alfonso <@bitnenfer>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var ArrayUtils = require('../../utils/array');
+var BlendModes = require('../../renderer/BlendModes');
 var Class = require('../../utils/Class');
 var Components = require('../components');
+var Events = require('../events');
 var GameObject = require('../GameObject');
 var Rectangle = require('../../geom/rectangle/Rectangle');
 var Render = require('./ContainerRender');
@@ -23,7 +25,7 @@ var Vector2 = require('../../math/Vector2');
  * By default it will be removed from the Display List and instead added to the Containers own internal list.
  *
  * The position of the Game Object automatically becomes relative to the position of the Container.
- * 
+ *
  * When the Container is rendered, all of its children are rendered as well, in the order in which they exist
  * within the Container. Container children can be repositioned using methods such as `MoveUp`, `MoveDown` and `SendToBack`.
  *
@@ -52,7 +54,7 @@ var Vector2 = require('../../math/Vector2');
  *
  * @class Container
  * @extends Phaser.GameObjects.GameObject
- * @memberOf Phaser.GameObjects
+ * @memberof Phaser.GameObjects
  * @constructor
  * @since 3.4.0
  *
@@ -60,7 +62,7 @@ var Vector2 = require('../../math/Vector2');
  * @extends Phaser.GameObjects.Components.BlendMode
  * @extends Phaser.GameObjects.Components.ComputedSize
  * @extends Phaser.GameObjects.Components.Depth
- * @extends Phaser.GameObjects.Components.ScrollFactor
+ * @extends Phaser.GameObjects.Components.Mask
  * @extends Phaser.GameObjects.Components.Transform
  * @extends Phaser.GameObjects.Components.Visible
  *
@@ -78,7 +80,7 @@ var Container = new Class({
         Components.BlendMode,
         Components.ComputedSize,
         Components.Depth,
-        Components.ScrollFactor,
+        Components.Mask,
         Components.Transform,
         Components.Visible,
         Render
@@ -101,10 +103,10 @@ var Container = new Class({
 
         /**
          * Does this Container exclusively manage its children?
-         * 
+         *
          * The default is `true` which means a child added to this Container cannot
          * belong in another Container, which includes the Scene display list.
-         * 
+         *
          * If you disable this then this Container will no longer exclusively manage its children.
          * This allows you to create all kinds of interesting graphical effects, such as replicating
          * Game Objects without reparenting them all over the Scene.
@@ -158,7 +160,7 @@ var Container = new Class({
          * @since 3.4.0
          */
         this.tempTransformMatrix = new Components.TransformMatrix();
- 
+
         /**
          * A reference to the Scene Display List.
          *
@@ -174,13 +176,80 @@ var Container = new Class({
          *
          * @name Phaser.GameObjects.Container#_sortKey
          * @type {string}
+         * @private
          * @since 3.4.0
          */
         this._sortKey = '';
 
+        /**
+         * A reference to the Scene Systems Event Emitter.
+         *
+         * @name Phaser.GameObjects.Container#_sysEvents
+         * @type {Phaser.Events.EventEmitter}
+         * @private
+         * @since 3.9.0
+         */
+        this._sysEvents = scene.sys.events;
+
+        /**
+         * The horizontal scroll factor of this Container.
+         *
+         * The scroll factor controls the influence of the movement of a Camera upon this Container.
+         *
+         * When a camera scrolls it will change the location at which this Container is rendered on-screen.
+         * It does not change the Containers actual position values.
+         * 
+         * For a Container, setting this value will only update the Container itself, not its children.
+         * If you wish to change the scrollFactor of the children as well, use the `setScrollFactor` method.
+         *
+         * A value of 1 means it will move exactly in sync with a camera.
+         * A value of 0 means it will not move at all, even if the camera moves.
+         * Other values control the degree to which the camera movement is mapped to this Container.
+         * 
+         * Please be aware that scroll factor values other than 1 are not taken in to consideration when
+         * calculating physics collisions. Bodies always collide based on their world position, but changing
+         * the scroll factor is a visual adjustment to where the textures are rendered, which can offset
+         * them from physics bodies if not accounted for in your code.
+         *
+         * @name Phaser.GameObjects.Container#scrollFactorX
+         * @type {number}
+         * @default 1
+         * @since 3.0.0
+         */
+        this.scrollFactorX = 1;
+
+        /**
+         * The vertical scroll factor of this Container.
+         *
+         * The scroll factor controls the influence of the movement of a Camera upon this Container.
+         *
+         * When a camera scrolls it will change the location at which this Container is rendered on-screen.
+         * It does not change the Containers actual position values.
+         * 
+         * For a Container, setting this value will only update the Container itself, not its children.
+         * If you wish to change the scrollFactor of the children as well, use the `setScrollFactor` method.
+         *
+         * A value of 1 means it will move exactly in sync with a camera.
+         * A value of 0 means it will not move at all, even if the camera moves.
+         * Other values control the degree to which the camera movement is mapped to this Container.
+         * 
+         * Please be aware that scroll factor values other than 1 are not taken in to consideration when
+         * calculating physics collisions. Bodies always collide based on their world position, but changing
+         * the scroll factor is a visual adjustment to where the textures are rendered, which can offset
+         * them from physics bodies if not accounted for in your code.
+         *
+         * @name Phaser.GameObjects.Container#scrollFactorY
+         * @type {number}
+         * @default 1
+         * @since 3.0.0
+         */
+        this.scrollFactorY = 1;
+
         this.setPosition(x, y);
 
         this.clearAlpha();
+
+        this.setBlendMode(BlendModes.SKIP_CHECK);
 
         if (children)
         {
@@ -194,7 +263,7 @@ var Container = new Class({
      *
      * @name Phaser.GameObjects.Container#originX
      * @type {number}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     originX: {
@@ -212,7 +281,7 @@ var Container = new Class({
      *
      * @name Phaser.GameObjects.Container#originY
      * @type {number}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     originY: {
@@ -230,7 +299,7 @@ var Container = new Class({
      *
      * @name Phaser.GameObjects.Container#displayOriginX
      * @type {number}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     displayOriginX: {
@@ -248,7 +317,7 @@ var Container = new Class({
      *
      * @name Phaser.GameObjects.Container#displayOriginY
      * @type {number}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     displayOriginY: {
@@ -262,10 +331,10 @@ var Container = new Class({
 
     /**
      * Does this Container exclusively manage its children?
-     * 
+     *
      * The default is `true` which means a child added to this Container cannot
      * belong in another Container, which includes the Scene display list.
-     * 
+     *
      * If you disable this then this Container will no longer exclusively manage its children.
      * This allows you to create all kinds of interesting graphical effects, such as replicating
      * Game Objects without reparenting them all over the Scene.
@@ -296,10 +365,10 @@ var Container = new Class({
      *
      * Some children are unable to return their bounds, such as Graphics objects, in which case
      * they are skipped.
-     * 
+     *
      * Depending on the quantity of children in this Container it could be a really expensive call,
      * so cache it and only poll it as needed.
-     * 
+     *
      * The values are stored and returned in a Rectangle object.
      *
      * @method Phaser.GameObjects.Container#getBounds
@@ -347,7 +416,7 @@ var Container = new Class({
      */
     addHandler: function (gameObject)
     {
-        gameObject.on('destroy', this.remove, this);
+        gameObject.once(Events.DESTROY, this.remove, this);
 
         if (this.exclusive)
         {
@@ -373,7 +442,7 @@ var Container = new Class({
      */
     removeHandler: function (gameObject)
     {
-        gameObject.off('destroy', this.remove, this);
+        gameObject.off(Events.DESTROY, this.remove);
 
         if (this.exclusive)
         {
@@ -416,6 +485,7 @@ var Container = new Class({
 
     /**
      * Returns the world transform matrix as used for Bounds checks.
+     * 
      * The returned matrix is temporal and shouldn't be stored.
      *
      * @method Phaser.GameObjects.Container#getBoundsTransformMatrix
@@ -425,12 +495,12 @@ var Container = new Class({
      */
     getBoundsTransformMatrix: function ()
     {
-        return this.getWorldTransformMatrix(this.tempTransformMatrix);
+        return this.getWorldTransformMatrix(this.tempTransformMatrix, this.localTransform);
     },
 
     /**
      * Adds the given Game Object, or array of Game Objects, to this Container.
-     * 
+     *
      * Each Game Object must be unique within the Container.
      *
      * @method Phaser.GameObjects.Container#add
@@ -449,9 +519,9 @@ var Container = new Class({
 
     /**
      * Adds the given Game Object, or array of Game Objects, to this Container at the specified position.
-     * 
+     *
      * Existing Game Objects in the Container are shifted up.
-     * 
+     *
      * Each Game Object must be unique within the Container.
      *
      * @method Phaser.GameObjects.Container#addAt
@@ -507,36 +577,28 @@ var Container = new Class({
      * @since 3.4.0
      *
      * @param {string} property - The property to lexically sort by.
+     * @param {function} [handler] - Provide your own custom handler function. Will receive 2 children which it should compare and return a boolean.
      *
      * @return {Phaser.GameObjects.Container} This Container instance.
      */
-    sort: function (property)
+    sort: function (property, handler)
     {
-        if (property)
+        if (!property)
         {
-            this._sortKey = property;
-
-            ArrayUtils.StableSort.inplace(this.list, this.sortHandler);
+            return this;
         }
 
-        return this;
-    },
+        if (handler === undefined)
+        {
+            handler = function (childA, childB)
+            {
+                return childA[property] - childB[property];
+            };
+        }
 
-    /**
-     * Internal sort handler method.
-     *
-     * @method Phaser.GameObjects.Container#sortHandler
-     * @private
-     * @since 3.4.0
-     *
-     * @param {Phaser.GameObjects.GameObject} childA - The first child to sort.
-     * @param {Phaser.GameObjects.GameObject} childB - The second child to sort.
-     *
-     * @return {integer} The sort results.
-     */
-    sortHandler: function (childA, childB)
-    {
-        return childA[this._sortKey] - childB[this._sortKey];
+        ArrayUtils.StableSort.inplace(this.list, handler);
+
+        return this;
     },
 
     /**
@@ -576,7 +638,7 @@ var Container = new Class({
      *
      * You can also specify a property and value to search for, in which case it will return the first
      * Game Object in this Container with a matching property and / or value.
-     * 
+     *
      * For example: `getFirst('visible', true)` would return the first Game Object that had its `visible` property set.
      *
      * You can limit the search to the `startIndex` - `endIndex` range.
@@ -584,8 +646,8 @@ var Container = new Class({
      * @method Phaser.GameObjects.Container#getFirst
      * @since 3.4.0
      *
-     * @param {string} [property] - The property to test on each Game Object in the Container.
-     * @param {*} [value] - The value to test the property against. Must pass a strict (`===`) comparison check.
+     * @param {string} property - The property to test on each Game Object in the Container.
+     * @param {*} value - The value to test the property against. Must pass a strict (`===`) comparison check.
      * @param {integer} [startIndex=0] - An optional start index to search from.
      * @param {integer} [endIndex=Container.length] - An optional end index to search up to (but not included)
      *
@@ -593,7 +655,7 @@ var Container = new Class({
      */
     getFirst: function (property, value, startIndex, endIndex)
     {
-        return ArrayUtils.GetFirstElement(this.list, property, value, startIndex, endIndex);
+        return ArrayUtils.GetFirst(this.list, property, value, startIndex, endIndex);
     },
 
     /**
@@ -604,7 +666,7 @@ var Container = new Class({
      * For example: `getAll('body')` would return only Game Objects that have a body property.
      *
      * You can also specify a value to compare the property to:
-     * 
+     *
      * `getAll('visible', true)` would return only Game Objects that have their visible property set to `true`.
      *
      * Optionally you can specify a start and end index. For example if this Container had 100 Game Objects,
@@ -629,16 +691,16 @@ var Container = new Class({
     /**
      * Returns the total number of Game Objects in this Container that have a property
      * matching the given value.
-     * 
+     *
      * For example: `count('visible', true)` would count all the elements that have their visible property set.
-     * 
+     *
      * You can optionally limit the operation to the `startIndex` - `endIndex` range.
      *
      * @method Phaser.GameObjects.Container#count
      * @since 3.4.0
      *
-     * @param {string} property - [description]
-     * @param {any} value - [description]
+     * @param {string} property - The property to check.
+     * @param {any} value - The value to check.
      * @param {integer} [startIndex=0] - An optional start index to search from.
      * @param {integer} [endIndex=Container.length] - An optional end index to search up to (but not included)
      *
@@ -658,7 +720,7 @@ var Container = new Class({
      *
      * @param {Phaser.GameObjects.GameObject} child1 - The first Game Object to swap.
      * @param {Phaser.GameObjects.GameObject} child2 - The second Game Object to swap.
-     * 
+     *
      * @return {Phaser.GameObjects.Container} This Container instance.
      */
     swap: function (child1, child2)
@@ -670,7 +732,7 @@ var Container = new Class({
 
     /**
      * Moves a Game Object to a new position within this Container.
-     * 
+     *
      * The Game Object must already be a child of this Container.
      *
      * The Game Object is removed from its old position and inserted into the new one.
@@ -693,7 +755,7 @@ var Container = new Class({
 
     /**
      * Removes the given Game Object, or array of Game Objects, from this Container.
-     * 
+     *
      * The Game Objects must already be children of this Container.
      *
      * You can also optionally call `destroy` on each Game Object that is removed from the Container.
@@ -728,7 +790,7 @@ var Container = new Class({
 
     /**
      * Removes the Game Object at the given position in this Container.
-     * 
+     *
      * You can also optionally call `destroy` on the Game Object, if one is found.
      *
      * @method Phaser.GameObjects.Container#removeAt
@@ -753,7 +815,7 @@ var Container = new Class({
 
     /**
      * Removes the Game Objects between the given positions in this Container.
-     * 
+     *
      * You can also optionally call `destroy` on each Game Object that is removed from the Container.
      *
      * @method Phaser.GameObjects.Container#removeBetween
@@ -782,7 +844,7 @@ var Container = new Class({
 
     /**
      * Removes all Game Objects from this Container.
-     * 
+     *
      * You can also optionally call `destroy` on each Game Object that is removed from the Container.
      *
      * @method Phaser.GameObjects.Container#removeAll
@@ -940,7 +1002,7 @@ var Container = new Class({
 
     /**
      * Returns `true` if the given Game Object is a direct child of this Container.
-     * 
+     *
      * This check does not scan nested Containers.
      *
      * @method Phaser.GameObjects.Container#exists
@@ -957,7 +1019,7 @@ var Container = new Class({
 
     /**
      * Sets the property to the given value on all Game Objects in this Container.
-     * 
+     *
      * Optionally you can specify a start and end index. For example if this Container had 100 Game Objects,
      * and you set `startIndex` to 0 and `endIndex` to 50, it would return matches from only
      * the first 50 Game Objects.
@@ -969,7 +1031,7 @@ var Container = new Class({
      * @param {any} value - The value to get the property to.
      * @param {integer} [startIndex=0] - An optional start index to search from.
      * @param {integer} [endIndex=Container.length] - An optional end index to search up to (but not included)
-     * 
+     *
      * @return {Phaser.GameObjects.Container} This Container instance.
      */
     setAll: function (property, value, startIndex, endIndex)
@@ -983,7 +1045,7 @@ var Container = new Class({
      * @callback EachContainerCallback
      * @generic I - [item]
      *
-     * @param {*} item - [description]
+     * @param {*} item - The child Game Object of the Container.
      * @param {...*} [args] - Additional arguments that will be passed to the callback, after the child.
      */
 
@@ -992,7 +1054,7 @@ var Container = new Class({
      *
      * A copy of the Container is made before passing each entry to your callback.
      * This protects against the callback itself modifying the Container.
-     * 
+     *
      * If you know for sure that the callback will not change the size of this Container
      * then you can use the more performant `Container.iterate` method instead.
      *
@@ -1002,7 +1064,7 @@ var Container = new Class({
      * @param {function} callback - The function to call.
      * @param {object} [context] - Value to use as `this` when executing callback.
      * @param {...*} [args] - Additional arguments that will be passed to the callback, after the child.
-     * 
+     *
      * @return {Phaser.GameObjects.Container} This Container instance.
      */
     each: function (callback, context)
@@ -1039,7 +1101,7 @@ var Container = new Class({
      * @param {function} callback - The function to call.
      * @param {object} [context] - Value to use as `this` when executing callback.
      * @param {...*} [args] - Additional arguments that will be passed to the callback, after the child.
-     * 
+     *
      * @return {Phaser.GameObjects.Container} This Container instance.
      */
     iterate: function (callback, context)
@@ -1063,11 +1125,54 @@ var Container = new Class({
     },
 
     /**
+     * Sets the scroll factor of this Container and optionally all of its children.
+     *
+     * The scroll factor controls the influence of the movement of a Camera upon this Game Object.
+     *
+     * When a camera scrolls it will change the location at which this Game Object is rendered on-screen.
+     * It does not change the Game Objects actual position values.
+     *
+     * A value of 1 means it will move exactly in sync with a camera.
+     * A value of 0 means it will not move at all, even if the camera moves.
+     * Other values control the degree to which the camera movement is mapped to this Game Object.
+     * 
+     * Please be aware that scroll factor values other than 1 are not taken in to consideration when
+     * calculating physics collisions. Bodies always collide based on their world position, but changing
+     * the scroll factor is a visual adjustment to where the textures are rendered, which can offset
+     * them from physics bodies if not accounted for in your code.
+     *
+     * @method Phaser.GameObjects.Container#setScrollFactor
+     * @since 3.0.0
+     *
+     * @param {number} x - The horizontal scroll factor of this Game Object.
+     * @param {number} [y=x] - The vertical scroll factor of this Game Object. If not set it will use the `x` value.
+     * @param {boolean} [updateChildren=false] - Apply this scrollFactor to all Container children as well?
+     *
+     * @return {this} This Game Object instance.
+     */
+    setScrollFactor: function (x, y, updateChildren)
+    {
+        if (y === undefined) { y = x; }
+        if (updateChildren === undefined) { updateChildren = false; }
+
+        this.scrollFactorX = x;
+        this.scrollFactorY = y;
+
+        if (updateChildren)
+        {
+            ArrayUtils.SetAll(this.list, 'scrollFactorX', x);
+            ArrayUtils.SetAll(this.list, 'scrollFactorY', y);
+        }
+
+        return this;
+    },
+
+    /**
      * The number of Game Objects inside this Container.
      *
      * @name Phaser.GameObjects.Container#length
      * @type {integer}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     length: {
@@ -1081,12 +1186,12 @@ var Container = new Class({
 
     /**
      * Returns the first Game Object within the Container, or `null` if it is empty.
-     * 
+     *
      * You can move the cursor by calling `Container.next` and `Container.previous`.
      *
      * @name Phaser.GameObjects.Container#first
      * @type {?Phaser.GameObjects.GameObject}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     first: {
@@ -1109,12 +1214,12 @@ var Container = new Class({
 
     /**
      * Returns the last Game Object within the Container, or `null` if it is empty.
-     * 
+     *
      * You can move the cursor by calling `Container.next` and `Container.previous`.
      *
      * @name Phaser.GameObjects.Container#last
      * @type {?Phaser.GameObjects.GameObject}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     last: {
@@ -1137,12 +1242,12 @@ var Container = new Class({
 
     /**
      * Returns the next Game Object within the Container, or `null` if it is empty.
-     * 
+     *
      * You can move the cursor by calling `Container.next` and `Container.previous`.
      *
      * @name Phaser.GameObjects.Container#next
      * @type {?Phaser.GameObjects.GameObject}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     next: {
@@ -1165,12 +1270,12 @@ var Container = new Class({
 
     /**
      * Returns the previous Game Object within the Container, or `null` if it is empty.
-     * 
+     *
      * You can move the cursor by calling `Container.next` and `Container.previous`.
      *
      * @name Phaser.GameObjects.Container#previous
      * @type {?Phaser.GameObjects.GameObject}
-     * @readOnly
+     * @readonly
      * @since 3.4.0
      */
     previous: {
@@ -1192,21 +1297,13 @@ var Container = new Class({
     },
 
     /**
-     * Destroys this Container, removing it from the Display List.
+     * Internal destroy handler, called as part of the destroy process.
      *
-     * If `Container.exclusive` is `true` then it will also destroy all children.
-     *
-     * Use this to remove a Container from your game if you don't ever plan to use it again.
-     * As long as no reference to it exists within your own code it should become free for
-     * garbage collection.
-     *
-     * If you just want to temporarily disable an object then look at using the
-     * Game Object Pool instead of destroying it, as destroyed objects cannot be resurrected.
-     *
-     * @method Phaser.GameObjects.Container#destroy
-     * @since 3.4.0
+     * @method Phaser.GameObjects.Container#preDestroy
+     * @protected
+     * @since 3.9.0
      */
-    destroy: function ()
+    preDestroy: function ()
     {
         this.removeAll(!!this.exclusive);
 
@@ -1215,8 +1312,6 @@ var Container = new Class({
 
         this.list = [];
         this._displayList = null;
-
-        GameObject.prototype.destroy.call(this);
     }
 
 });

@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 /**
@@ -10,7 +10,7 @@
  * Display values contain the calculated pixel values.
  * Should be applied as a mixin and not used directly.
  *
- * @name Phaser.GameObjects.Components.Origin
+ * @namespace Phaser.GameObjects.Components.Origin
  * @since 3.0.0
  */
 
@@ -34,7 +34,7 @@ var Origin = {
      * Setting the value to 0 means the position now relates to the left of the Game Object.
      *
      * @name Phaser.GameObjects.Components.Origin#originX
-     * @type {float}
+     * @type {number}
      * @default 0.5
      * @since 3.0.0
      */
@@ -47,7 +47,7 @@ var Origin = {
      * Setting the value to 0 means the position now relates to the top of the Game Object.
      *
      * @name Phaser.GameObjects.Components.Origin#originY
-     * @type {float}
+     * @type {number}
      * @default 0.5
      * @since 3.0.0
      */
@@ -63,7 +63,7 @@ var Origin = {
      * The displayOrigin is a pixel value, based on the size of the Game Object combined with the origin.
      *
      * @name Phaser.GameObjects.Components.Origin#displayOriginX
-     * @type {float}
+     * @type {number}
      * @since 3.0.0
      */
     displayOriginX: {
@@ -87,7 +87,7 @@ var Origin = {
      * The displayOrigin is a pixel value, based on the size of the Game Object combined with the origin.
      *
      * @name Phaser.GameObjects.Components.Origin#displayOriginY
-     * @type {float}
+     * @type {number}
      * @since 3.0.0
      */
     displayOriginY: {
@@ -116,7 +116,7 @@ var Origin = {
      * @param {number} [x=0.5] - The horizontal origin value.
      * @param {number} [y=x] - The vertical origin value. If not defined it will be set to the value of `x`.
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     setOrigin: function (x, y)
     {
@@ -135,7 +135,7 @@ var Origin = {
      * @method Phaser.GameObjects.Components.Origin#setOriginFromFrame
      * @since 3.0.0
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     setOriginFromFrame: function ()
     {
@@ -162,7 +162,7 @@ var Origin = {
      * @param {number} [x=0] - The horizontal display origin value.
      * @param {number} [y=x] - The vertical display origin value. If not defined it will be set to the value of `x`.
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     setDisplayOrigin: function (x, y)
     {
@@ -182,12 +182,12 @@ var Origin = {
      * @method Phaser.GameObjects.Components.Origin#updateDisplayOrigin
      * @since 3.0.0
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     updateDisplayOrigin: function ()
     {
-        this._displayOriginX = Math.round(this.originX * this.width);
-        this._displayOriginY = Math.round(this.originY * this.height);
+        this._displayOriginX = this.originX * this.width;
+        this._displayOriginY = this.originY * this.height;
 
         return this;
     }

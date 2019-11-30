@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 /**
@@ -13,7 +13,7 @@
  * @param {array} array - The array to search.
  * @param {function} callback - A callback to be invoked for each item in the array.
  * @param {object} context - The context in which the callback is invoked.
- * @param {...*} [args] - Additional arguments that will be passed to the callback, after the child.
+ * @param {...*} [args] - Additional arguments that will be passed to the callback, after the current array item.
  *
  * @return {array} The input array.
  */
@@ -22,7 +22,7 @@ var Each = function (array, callback, context)
     var i;
     var args = [ null ];
 
-    for (i = 2; i < arguments.length; i++)
+    for (i = 3; i < arguments.length; i++)
     {
         args.push(arguments[i]);
     }

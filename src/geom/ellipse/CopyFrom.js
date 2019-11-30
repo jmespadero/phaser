@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 /**
@@ -16,7 +16,7 @@
  * @param {Phaser.Geom.Ellipse} source - The source Ellipse to copy the values from.
  * @param {Phaser.Geom.Ellipse} dest - The destination Ellipse to copy the values to.
  *
- * @return {Phaser.Geom.Ellipse} The dest Ellipse.
+ * @return {Phaser.Geom.Ellipse} The destination Ellipse.
  */
 var CopyFrom = function (source, dest)
 {

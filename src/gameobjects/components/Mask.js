@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var BitmapMask = require('../../display/mask/BitmapMask');
@@ -10,7 +10,7 @@ var GeometryMask = require('../../display/mask/GeometryMask');
 /**
  * Provides methods used for getting and setting the mask of a Game Object.
  *
- * @name Phaser.GameObjects.Components.Mask
+ * @namespace Phaser.GameObjects.Components.Mask
  * @since 3.0.0
  */
 
@@ -28,19 +28,23 @@ var Mask = {
     /**
      * Sets the mask that this Game Object will use to render with.
      *
-     * The mask must have been previously created and can be either a
-     * GeometryMask or a BitmapMask.
-     *
+     * The mask must have been previously created and can be either a GeometryMask or a BitmapMask.
      * Note: Bitmap Masks only work on WebGL. Geometry Masks work on both WebGL and Canvas.
      *
      * If a mask is already set on this Game Object it will be immediately replaced.
+     * 
+     * Masks are positioned in global space and are not relative to the Game Object to which they
+     * are applied. The reason for this is that multiple Game Objects can all share the same mask.
+     * 
+     * Masks have no impact on physics or input detection. They are purely a rendering component
+     * that allows you to limit what is visible during the render pass.
      *
      * @method Phaser.GameObjects.Components.Mask#setMask
      * @since 3.6.2
      *
      * @param {Phaser.Display.Masks.BitmapMask|Phaser.Display.Masks.GeometryMask} mask - The mask this Game Object will use when rendering.
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     setMask: function (mask)
     {
@@ -57,13 +61,13 @@ var Mask = {
      *
      * @param {boolean} [destroyMask=false] - Destroy the mask before clearing it?
      *
-     * @return {Phaser.GameObjects.GameObject} This Game Object instance.
+     * @return {this} This Game Object instance.
      */
     clearMask: function (destroyMask)
     {
         if (destroyMask === undefined) { destroyMask = false; }
 
-        if (destroyMask)
+        if (destroyMask && this.mask)
         {
             this.mask.destroy();
         }
@@ -94,7 +98,7 @@ var Mask = {
      */
     createBitmapMask: function (renderable)
     {
-        if (renderable === undefined && this.texture)
+        if (renderable === undefined && (this.texture || this.shader))
         {
             // eslint-disable-next-line consistent-this
             renderable = this;

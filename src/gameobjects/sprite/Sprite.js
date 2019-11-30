@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../../utils/Class');
@@ -23,7 +23,7 @@ var SpriteRender = require('./SpriteRender');
  *
  * @class Sprite
  * @extends Phaser.GameObjects.GameObject
- * @memberOf Phaser.GameObjects
+ * @memberof Phaser.GameObjects
  * @constructor
  * @since 3.0.0
  *
@@ -35,10 +35,9 @@ var SpriteRender = require('./SpriteRender');
  * @extends Phaser.GameObjects.Components.Mask
  * @extends Phaser.GameObjects.Components.Origin
  * @extends Phaser.GameObjects.Components.Pipeline
- * @extends Phaser.GameObjects.Components.ScaleMode
  * @extends Phaser.GameObjects.Components.ScrollFactor
  * @extends Phaser.GameObjects.Components.Size
- * @extends Phaser.GameObjects.Components.Texture
+ * @extends Phaser.GameObjects.Components.TextureCrop
  * @extends Phaser.GameObjects.Components.Tint
  * @extends Phaser.GameObjects.Components.Transform
  * @extends Phaser.GameObjects.Components.Visible
@@ -62,10 +61,9 @@ var Sprite = new Class({
         Components.Mask,
         Components.Origin,
         Components.Pipeline,
-        Components.ScaleMode,
         Components.ScrollFactor,
         Components.Size,
-        Components.Texture,
+        Components.TextureCrop,
         Components.Tint,
         Components.Transform,
         Components.Visible,
@@ -79,7 +77,17 @@ var Sprite = new Class({
         GameObject.call(this, scene, 'Sprite');
 
         /**
-         * [description]
+         * The internal crop data object, as used by `setCrop` and passed to the `Frame.setCropUVs` method.
+         *
+         * @name Phaser.GameObjects.Sprite#_crop
+         * @type {object}
+         * @private
+         * @since 3.11.0
+         */
+        this._crop = this.resetCropObject();
+
+        /**
+         * The Animation Controller of this Sprite.
          *
          * @name Phaser.GameObjects.Sprite#anims
          * @type {Phaser.GameObjects.Components.Animation}
@@ -91,18 +99,18 @@ var Sprite = new Class({
         this.setPosition(x, y);
         this.setSizeToFrame();
         this.setOriginFromFrame();
-        this.initPipeline('TextureTintPipeline');
+        this.initPipeline();
     },
 
     /**
-     * [description]
+     * Update this Sprite's animations.
      *
      * @method Phaser.GameObjects.Sprite#preUpdate
      * @protected
      * @since 3.0.0
      *
-     * @param {number} time - [description]
-     * @param {number} delta - [description]
+     * @param {number} time - The current timestamp.
+     * @param {number} delta - The delta time, in ms, elapsed since the last frame.
      */
     preUpdate: function (time, delta)
     {
@@ -110,14 +118,14 @@ var Sprite = new Class({
     },
 
     /**
-     * [description]
+     * Start playing the given animation.
      *
      * @method Phaser.GameObjects.Sprite#play
      * @since 3.0.0
      *
-     * @param {string} key - [description]
-     * @param {boolean} [ignoreIfPlaying=false] - [description]
-     * @param {integer} [startFrame=0] - [description]
+     * @param {string} key - The string-based key of the animation to play.
+     * @param {boolean} [ignoreIfPlaying=false] - If an animation is already playing then ignore this call.
+     * @param {integer} [startFrame=0] - Optionally start the animation playing from this frame index.
      *
      * @return {Phaser.GameObjects.Sprite} This Game Object.
      */
@@ -129,12 +137,12 @@ var Sprite = new Class({
     },
 
     /**
-     * [description]
+     * Build a JSON representation of this Sprite.
      *
      * @method Phaser.GameObjects.Sprite#toJSON
      * @since 3.0.0
      *
-     * @return {JSONGameObject} A JSON representation of the Game Object.
+     * @return {Phaser.Types.GameObjects.JSONGameObject} A JSON representation of the Game Object.
      */
     toJSON: function ()
     {
@@ -143,6 +151,20 @@ var Sprite = new Class({
         //  Extra Sprite data is added here
 
         return data;
+    },
+
+    /**
+     * Handles the pre-destroy step for the Sprite, which removes the Animation component.
+     *
+     * @method Phaser.GameObjects.Sprite#preDestroy
+     * @private
+     * @since 3.14.0
+     */
+    preDestroy: function ()
+    {
+        this.anims.destroy();
+
+        this.anims = undefined;
     }
 
 });

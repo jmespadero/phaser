@@ -1,12 +1,13 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../../utils/Class');
 var GetPoint = require('./GetPoint');
 var GetPoints = require('./GetPoints');
+var GEOM_CONST = require('../const');
 var Random = require('./Random');
 var Vector2 = require('../../math/Vector2');
 
@@ -15,7 +16,7 @@ var Vector2 = require('../../math/Vector2');
  * Defines a Line segment, a part of a line between two endpoints.
  *
  * @class Line
- * @memberOf Phaser.Geom
+ * @memberof Phaser.Geom
  * @constructor
  * @since 3.0.0
  *
@@ -34,6 +35,17 @@ var Line = new Class({
         if (y1 === undefined) { y1 = 0; }
         if (x2 === undefined) { x2 = 0; }
         if (y2 === undefined) { y2 = 0; }
+
+        /**
+         * The geometry constant type of this object: `GEOM_CONST.LINE`.
+         * Used for fast type comparisons.
+         *
+         * @name Phaser.Geom.Line#type
+         * @type {integer}
+         * @readonly
+         * @since 3.19.0
+         */
+        this.type = GEOM_CONST.LINE;
 
         /**
          * The x coordinate of the lines starting point.
@@ -73,15 +85,15 @@ var Line = new Class({
     },
 
     /**
-     * [description]
+     * Get a point on a line that's a given percentage along its length.
      *
      * @method Phaser.Geom.Line#getPoint
      * @since 3.0.0
      *
      * @generic {Phaser.Geom.Point} O - [output,$return]
      *
-     * @param {float} position - [description]
-     * @param {(Phaser.Geom.Point|object)} [output] - [description]
+     * @param {number} position - A value between 0 and 1, where 0 is the start, 0.5 is the middle and 1 is the end of the line.
+     * @param {(Phaser.Geom.Point|object)} [output] - An optional point, or point-like object, to store the coordinates of the point on the line.
      *
      * @return {(Phaser.Geom.Point|object)} A Point, or point-like object, containing the coordinates of the point on the line.
      */
@@ -91,18 +103,23 @@ var Line = new Class({
     },
 
     /**
-     * [description]
+     * Get a number of points along a line's length.
+     *
+     * Provide a `quantity` to get an exact number of points along the line.
+     *
+     * Provide a `stepRate` to ensure a specific distance between each point on the line. Set `quantity` to `0` when
+     * providing a `stepRate`.
      *
      * @method Phaser.Geom.Line#getPoints
      * @since 3.0.0
      *
      * @generic {Phaser.Geom.Point} O - [output,$return]
      *
-     * @param {integer} quantity - [description]
-     * @param {integer} [stepRate] - [description]
-     * @param {(array|Phaser.Geom.Point[])} [output] - [description]
+     * @param {integer} quantity - The number of points to place on the line. Set to `0` to use `stepRate` instead.
+     * @param {integer} [stepRate] - The distance between each point on the line. When set, `quantity` is implied and should be set to `0`.
+     * @param {(array|Phaser.Geom.Point[])} [output] - An optional array of Points, or point-like objects, to store the coordinates of the points on the line.
      *
-     * @return {(array|Phaser.Geom.Point[])} [description]
+     * @return {(array|Phaser.Geom.Point[])} An array of Points, or point-like objects, containing the coordinates of the points on the line.
      */
     getPoints: function (quantity, stepRate, output)
     {
@@ -177,7 +194,7 @@ var Line = new Class({
     },
 
     /**
-     * Returns a Vector2 object that corresponds to the start of this Line.
+     * Returns a Vector2 object that corresponds to the end of this Line.
      *
      * @method Phaser.Geom.Line#getPointB
      * @since 3.0.0
@@ -186,7 +203,7 @@ var Line = new Class({
      *
      * @param {Phaser.Math.Vector2} [vec2] - A Vector2 object to set the results in. If `undefined` a new Vector2 will be created.
      *
-     * @return {Phaser.Math.Vector2} A Vector2 object that corresponds to the start of this Line.
+     * @return {Phaser.Math.Vector2} A Vector2 object that corresponds to the end of this Line.
      */
     getPointB: function (vec2)
     {

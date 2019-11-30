@@ -1,10 +1,8 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
-
-var GameObject = require('../GameObject');
 
 /**
  * Renders this Game Object with the WebGL Renderer to the given Camera.
@@ -23,11 +21,6 @@ var GameObject = require('../GameObject');
  */
 var ImageWebGLRenderer = function (renderer, src, interpolationPercentage, camera, parentMatrix)
 {
-    if (GameObject.RENDER_MASK !== src.renderFlags || (src.cameraFilter > 0 && (src.cameraFilter & camera._id)))
-    {
-        return;
-    }
-    
     this.pipeline.batchSprite(src, camera, parentMatrix);
 };
 

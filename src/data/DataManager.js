@@ -1,10 +1,11 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../utils/Class');
+var Events = require('./events');
 
 /**
  * @callback DataEachCallback
@@ -17,12 +18,12 @@ var Class = require('../utils/Class');
 
 /**
  * @classdesc
- * The Data Component features a means to store pieces of data specific to a Game Object, System or Plugin.
+ * The Data Manager Component features a means to store pieces of data specific to a Game Object, System or Plugin.
  * You can then search, query it, and retrieve the data. The parent must either extend EventEmitter,
  * or have a property called `events` that is an instance of it.
  *
  * @class DataManager
- * @memberOf Phaser.Data
+ * @memberof Phaser.Data
  * @constructor
  * @since 3.0.0
  *
@@ -69,17 +70,31 @@ var DataManager = new Class({
         this.list = {};
 
         /**
-         * Whether setting data is blocked for this DataManager.
+         * The public values list. You can use this to access anything you have stored
+         * in this Data Manager. For example, if you set a value called `gold` you can
+         * access it via:
          *
-         * Used temporarily to allow 'changedata' event listeners to prevent
-         * specific data from being set.
+         * ```javascript
+         * this.data.values.gold;
+         * ```
          *
-         * @name Phaser.Data.DataManager#blockSet
-         * @type {boolean}
-         * @default false
-         * @since 3.0.0
+         * You can also modify it directly:
+         * 
+         * ```javascript
+         * this.data.values.gold += 1000;
+         * ```
+         *
+         * Doing so will emit a `setdata` event from the parent of this Data Manager.
+         * 
+         * Do not modify this object directly. Adding properties directly to this object will not
+         * emit any events. Always use `DataManager.set` to create new items the first time around.
+         *
+         * @name Phaser.Data.DataManager#values
+         * @type {Object.<string, *>}
+         * @default {}
+         * @since 3.10.0
          */
-        this.blockSet = false;
+        this.values = {};
 
         /**
          * Whether setting data is frozen for this DataManager.
@@ -101,20 +116,56 @@ var DataManager = new Class({
     /**
      * Retrieves the value for the given key, or undefined if it doesn't exist.
      *
+     * You can also access values via the `values` object. For example, if you had a key called `gold` you can do either:
+     * 
+     * ```javascript
+     * this.data.get('gold');
+     * ```
+     *
+     * Or access the value directly:
+     * 
+     * ```javascript
+     * this.data.values.gold;
+     * ```
+     *
+     * You can also pass in an array of keys, in which case an array of values will be returned:
+     * 
+     * ```javascript
+     * this.data.get([ 'gold', 'armor', 'health' ]);
+     * ```
+     *
+     * This approach is useful for destructuring arrays in ES6.
+     *
      * @method Phaser.Data.DataManager#get
      * @since 3.0.0
      *
-     * @param {string} key - The key of the value to retrieve.
+     * @param {(string|string[])} key - The key of the value to retrieve, or an array of keys.
      *
-     * @return {*} The value belonging to the given key.
+     * @return {*} The value belonging to the given key, or an array of values, the order of which will match the input array.
      */
     get: function (key)
     {
-        return this.list[key];
+        var list = this.list;
+
+        if (Array.isArray(key))
+        {
+            var output = [];
+
+            for (var i = 0; i < key.length; i++)
+            {
+                output.push(list[key[i]]);
+            }
+
+            return output;
+        }
+        else
+        {
+            return list[key];
+        }
     },
 
     /**
-     * Retrieves all data values.
+     * Retrieves all data values in a new object.
      *
      * @method Phaser.Data.DataManager#getAll
      * @since 3.0.0
@@ -127,7 +178,7 @@ var DataManager = new Class({
 
         for (var key in this.list)
         {
-            if(this.list.hasOwnProperty(key))
+            if (this.list.hasOwnProperty(key))
             {
                 results[key] = this.list[key];
             }
@@ -137,12 +188,12 @@ var DataManager = new Class({
     },
 
     /**
-     * Queries the DataManager for the values of keys matching the given search string.
+     * Queries the DataManager for the values of keys matching the given regular expression.
      *
      * @method Phaser.Data.DataManager#query
      * @since 3.0.0
      *
-     * @param {string} search - The search string.
+     * @param {RegExp} search - A regular expression object. If a non-RegExp object obj is passed, it is implicitly converted to a RegExp by using new RegExp(obj).
      *
      * @return {Object.<string, *>} The values of the keys matching the search string.
      */
@@ -162,15 +213,47 @@ var DataManager = new Class({
     },
 
     /**
-     * Sets the value for the given key.
+     * Sets a value for the given key. If the key doesn't already exist in the Data Manager then it is created.
+     * 
+     * ```javascript
+     * data.set('name', 'Red Gem Stone');
+     * ```
      *
-     * Emits the 'changedata' and 'setdata' events.
+     * You can also pass in an object of key value pairs as the first argument:
+     *
+     * ```javascript
+     * data.set({ name: 'Red Gem Stone', level: 2, owner: 'Link', gold: 50 });
+     * ```
+     *
+     * To get a value back again you can call `get`:
+     * 
+     * ```javascript
+     * data.get('gold');
+     * ```
+     * 
+     * Or you can access the value directly via the `values` property, where it works like any other variable:
+     * 
+     * ```javascript
+     * data.values.gold += 50;
+     * ```
+     *
+     * When the value is first set, a `setdata` event is emitted.
+     *
+     * If the key already exists, a `changedata` event is emitted instead, along an event named after the key.
+     * For example, if you updated an existing key called `PlayerLives` then it would emit the event `changedata-PlayerLives`.
+     * These events will be emitted regardless if you use this method to set the value, or the direct `values` setter.
+     *
+     * Please note that the data keys are case-sensitive and must be valid JavaScript Object property strings.
+     * This means the keys `gold` and `Gold` are treated as two unique values within the Data Manager.
      *
      * @method Phaser.Data.DataManager#set
+     * @fires Phaser.Data.Events#SET_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA_KEY
      * @since 3.0.0
      *
-     * @param {string} key - The key to set the value for.
-     * @param {*} data - The value to set.
+     * @param {(string|object)} key - The key to set the value for. Or an object or key value pairs. If an object the `data` argument is ignored.
+     * @param {*} data - The value to set for the given key. If an object is provided as the key this argument is ignored.
      *
      * @return {Phaser.Data.DataManager} This DataManager object.
      */
@@ -181,48 +264,101 @@ var DataManager = new Class({
             return this;
         }
 
-        if (this.events.listenerCount('changedata') > 0)
+        if (typeof key === 'string')
         {
-            this.blockSet = false;
-
-            var _this = this;
-
-            var resetFunction = function (value)
+            return this.setValue(key, data);
+        }
+        else
+        {
+            for (var entry in key)
             {
-                _this.blockSet = true;
-                _this.list[key] = value;
-                _this.events.emit('setdata', _this.parent, key, value);
-            };
-
-            this.events.emit('changedata', this.parent, key, data, resetFunction);
-
-            //  One of the listeners blocked this update from being set, so abort
-            if (this.blockSet)
-            {
-                return this;
+                this.setValue(entry, key[entry]);
             }
         }
-
-        this.list[key] = data;
-
-        this.events.emit('setdata', this.parent, key, data);
 
         return this;
     },
 
     /**
-     * Passes all data entries to the given callback. Stores the result of the callback.
+     * Internal value setter, called automatically by the `set` method.
+     *
+     * @method Phaser.Data.DataManager#setValue
+     * @fires Phaser.Data.Events#SET_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA_KEY
+     * @private
+     * @since 3.10.0
+     *
+     * @param {string} key - The key to set the value for.
+     * @param {*} data - The value to set.
+     *
+     * @return {Phaser.Data.DataManager} This DataManager object.
+     */
+    setValue: function (key, data)
+    {
+        if (this._frozen)
+        {
+            return this;
+        }
+
+        if (this.has(key))
+        {
+            //  Hit the key getter, which will in turn emit the events.
+            this.values[key] = data;
+        }
+        else
+        {
+            var _this = this;
+            var list = this.list;
+            var events = this.events;
+            var parent = this.parent;
+
+            Object.defineProperty(this.values, key, {
+
+                enumerable: true,
+                
+                configurable: true,
+
+                get: function ()
+                {
+                    return list[key];
+                },
+
+                set: function (value)
+                {
+                    if (!_this._frozen)
+                    {
+                        var previousValue = list[key];
+                        list[key] = value;
+
+                        events.emit(Events.CHANGE_DATA, parent, key, value, previousValue);
+                        events.emit(Events.CHANGE_DATA_KEY + key, parent, value, previousValue);
+                    }
+                }
+
+            });
+
+            list[key] = data;
+
+            events.emit(Events.SET_DATA, parent, key, data);
+        }
+
+        return this;
+    },
+
+    /**
+     * Passes all data entries to the given callback.
      *
      * @method Phaser.Data.DataManager#each
      * @since 3.0.0
      *
      * @param {DataEachCallback} callback - The function to call.
-     * @param {*} [scope] - Value to use as `this` when executing callback.
+     * @param {*} [context] - Value to use as `this` when executing callback.
      * @param {...*} [args] - Additional arguments that will be passed to the callback, after the game object, key, and data.
      *
      * @return {Phaser.Data.DataManager} This DataManager object.
      */
-    each: function (callback, scope)
+    each: function (callback, context)
     {
         var args = [ this.parent, null, undefined ];
 
@@ -236,20 +372,26 @@ var DataManager = new Class({
             args[1] = key;
             args[2] = this.list[key];
 
-            callback.apply(scope, args);
+            callback.apply(context, args);
         }
 
         return this;
     },
 
     /**
-     * Merge the given data object into this DataManager's data object.
+     * Merge the given object of key value pairs into this DataManager.
+     *
+     * Any newly created values will emit a `setdata` event. Any updated values (see the `overwrite` argument)
+     * will emit a `changedata` event.
      *
      * @method Phaser.Data.DataManager#merge
+     * @fires Phaser.Data.Events#SET_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA
+     * @fires Phaser.Data.Events#CHANGE_DATA_KEY
      * @since 3.0.0
      *
      * @param {Object.<string, *>} data - The data to merge.
-     * @param {boolean} overwrite - Whether to overwrite existing data. Defaults to true.
+     * @param {boolean} [overwrite=true] - Whether to overwrite existing data. Defaults to true.
      *
      * @return {Phaser.Data.DataManager} This DataManager object.
      */
@@ -262,7 +404,7 @@ var DataManager = new Class({
         {
             if (data.hasOwnProperty(key) && (overwrite || (!overwrite && !this.has(key))))
             {
-                this.list[key] = data[key];
+                this.setValue(key, data[key]);
             }
         }
 
@@ -272,31 +414,77 @@ var DataManager = new Class({
     /**
      * Remove the value for the given key.
      *
+     * If the key is found in this Data Manager it is removed from the internal lists and a
+     * `removedata` event is emitted.
+     * 
+     * You can also pass in an array of keys, in which case all keys in the array will be removed:
+     * 
+     * ```javascript
+     * this.data.remove([ 'gold', 'armor', 'health' ]);
+     * ```
+     *
      * @method Phaser.Data.DataManager#remove
+     * @fires Phaser.Data.Events#REMOVE_DATA
      * @since 3.0.0
      *
-     * @param {string} key - The key to remove
+     * @param {(string|string[])} key - The key to remove, or an array of keys to remove.
      *
      * @return {Phaser.Data.DataManager} This DataManager object.
      */
     remove: function (key)
     {
-        if (!this._frozen && this.has(key))
+        if (this._frozen)
         {
-            var data = this.list[key];
+            return this;
+        }
 
-            delete this.list[key];
-
-            this.events.emit('removedata', this, key, data);
+        if (Array.isArray(key))
+        {
+            for (var i = 0; i < key.length; i++)
+            {
+                this.removeValue(key[i]);
+            }
+        }
+        else
+        {
+            return this.removeValue(key);
         }
 
         return this;
     },
 
     /**
-     * Retrieves the data associated with the given 'key', deletes it from this Data store, then returns it.
+     * Internal value remover, called automatically by the `remove` method.
+     *
+     * @method Phaser.Data.DataManager#removeValue
+     * @private
+     * @fires Phaser.Data.Events#REMOVE_DATA
+     * @since 3.10.0
+     *
+     * @param {string} key - The key to set the value for.
+     *
+     * @return {Phaser.Data.DataManager} This DataManager object.
+     */
+    removeValue: function (key)
+    {
+        if (this.has(key))
+        {
+            var data = this.list[key];
+
+            delete this.list[key];
+            delete this.values[key];
+
+            this.events.emit(Events.REMOVE_DATA, this.parent, key, data);
+        }
+
+        return this;
+    },
+
+    /**
+     * Retrieves the data associated with the given 'key', deletes it from this Data Manager, then returns it.
      *
      * @method Phaser.Data.DataManager#pop
+     * @fires Phaser.Data.Events#REMOVE_DATA
      * @since 3.0.0
      *
      * @param {string} key - The key of the value to retrieve and delete.
@@ -312,22 +500,26 @@ var DataManager = new Class({
             data = this.list[key];
 
             delete this.list[key];
+            delete this.values[key];
 
-            this.events.emit('removedata', this, key, data);
+            this.events.emit(Events.REMOVE_DATA, this.parent, key, data);
         }
 
         return data;
     },
 
     /**
-     * Determines whether the given key is set in this Data store.
+     * Determines whether the given key is set in this Data Manager.
+     * 
+     * Please note that the keys are case-sensitive and must be valid JavaScript Object property strings.
+     * This means the keys `gold` and `Gold` are treated as two unique values within the Data Manager.
      *
      * @method Phaser.Data.DataManager#has
      * @since 3.0.0
      *
      * @param {string} key - The key to check.
      *
-     * @return {boolean} Whether the key is set.
+     * @return {boolean} Returns `true` if the key exists, otherwise `false`.
      */
     has: function (key)
     {
@@ -335,12 +527,13 @@ var DataManager = new Class({
     },
 
     /**
-     * Freeze or unfreeze this Data store, to allow or prevent setting its values.
+     * Freeze or unfreeze this Data Manager. A frozen Data Manager will block all attempts
+     * to create new values or update existing ones.
      *
      * @method Phaser.Data.DataManager#setFreeze
      * @since 3.0.0
      *
-     * @param {boolean} value - Whether to freeze the Data store.
+     * @param {boolean} value - Whether to freeze or unfreeze the Data Manager.
      *
      * @return {Phaser.Data.DataManager} This DataManager object.
      */
@@ -352,7 +545,7 @@ var DataManager = new Class({
     },
 
     /**
-     * Delete all data in this Data store and unfreeze it.
+     * Delete all data in this Data Manager and unfreeze it.
      *
      * @method Phaser.Data.DataManager#reset
      * @since 3.0.0
@@ -364,9 +557,9 @@ var DataManager = new Class({
         for (var key in this.list)
         {
             delete this.list[key];
+            delete this.values[key];
         }
 
-        this.blockSet = false;
         this._frozen = false;
 
         return this;
@@ -382,15 +575,16 @@ var DataManager = new Class({
     {
         this.reset();
 
-        this.events.off('changedata');
-        this.events.off('setdata');
-        this.events.off('removedata');
+        this.events.off(Events.CHANGE_DATA);
+        this.events.off(Events.SET_DATA);
+        this.events.off(Events.REMOVE_DATA);
 
         this.parent = null;
     },
 
     /**
-     * Freeze this Data component, so no values can be set.
+     * Gets or sets the frozen state of this Data Manager.
+     * A frozen Data Manager will block all attempts to create new values or update existing ones.
      *
      * @name Phaser.Data.DataManager#freeze
      * @type {boolean}
@@ -411,7 +605,7 @@ var DataManager = new Class({
     },
 
     /**
-     * Return the total number of entries in this Data component.
+     * Return the total number of entries in this Data Manager.
      *
      * @name Phaser.Data.DataManager#count
      * @type {integer}

@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 /**
@@ -98,7 +98,7 @@ var AddAt = function (array, item, index, limit, callback, context)
         itemLength = remaining;
     }
 
-    for (var i = itemLength; i > 0; i--)
+    for (var i = itemLength - 1; i >= 0; i--)
     {
         var entry = item[i];
 

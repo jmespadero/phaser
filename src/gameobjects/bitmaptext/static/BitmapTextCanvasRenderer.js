@@ -1,10 +1,10 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
-var GameObject = require('../../GameObject');
+var SetTransform = require('../../../renderer/canvas/utils/SetTransform');
 
 /**
  * Renders this Game Object with the Canvas Renderer to the given Camera.
@@ -23,10 +23,12 @@ var GameObject = require('../../GameObject');
  */
 var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage, camera, parentMatrix)
 {
-    var text = src.text;
+    var text = src._text;
     var textLength = text.length;
 
-    if (GameObject.RENDER_MASK !== src.renderFlags || textLength === 0 || (src.cameraFilter > 0 && (src.cameraFilter & camera._id)))
+    var ctx = renderer.currentContext;
+
+    if (textLength === 0 || !SetTransform(renderer, ctx, src, camera, parentMatrix))
     {
         return;
     }
@@ -35,12 +37,11 @@ var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage,
 
     var chars = src.fontData.chars;
     var lineHeight = src.fontData.lineHeight;
-    var letterSpacing = src.letterSpacing;
+    var letterSpacing = src._letterSpacing;
 
     var xAdvance = 0;
     var yAdvance = 0;
 
-    var indexCount = 0;
     var charCode = 0;
 
     var glyph = null;
@@ -55,71 +56,63 @@ var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage,
     var lastGlyph = null;
     var lastCharCode = 0;
 
-    var ctx = renderer.currentContext;
     var image = src.frame.source.image;
 
     var textureX = textureFrame.cutX;
     var textureY = textureFrame.cutY;
 
-    var scale = (src.fontSize / src.fontData.size);
+    var scale = (src._fontSize / src.fontData.size);
 
-    //  Blend Mode
-    if (renderer.currentBlendMode !== src.blendMode)
+    var align = src._align;
+    var currentLine = 0;
+    var lineOffsetX = 0;
+
+    //  Update the bounds - skipped internally if not dirty
+    var bounds = src.getTextBounds(false);
+
+    //  In case the method above changed it (word wrapping)
+    if (src.maxWidth > 0)
     {
-        renderer.currentBlendMode = src.blendMode;
-        ctx.globalCompositeOperation = renderer.blendModes[src.blendMode];
+        text = bounds.wrappedText;
+        textLength = text.length;
     }
 
-    //  Alpha
-    if (renderer.currentAlpha !== src.alpha)
+    var lineData = src._bounds.lines;
+
+    if (align === 1)
     {
-        renderer.currentAlpha = src.alpha;
-        ctx.globalAlpha = src.alpha;
+        lineOffsetX = (lineData.longest - lineData.lengths[0]) / 2;
     }
-
-    //  Smoothing
-    if (renderer.currentScaleMode !== src.scaleMode)
+    else if (align === 2)
     {
-        renderer.currentScaleMode = src.scaleMode;
+        lineOffsetX = (lineData.longest - lineData.lengths[0]);
     }
-
-    var roundPixels = renderer.config.roundPixels;
-
-    var tx = (src.x - camera.scrollX * src.scrollFactorX) + src.frame.x;
-    var ty = (src.y - camera.scrollY * src.scrollFactorY) + src.frame.y;
-
-    if (roundPixels)
-    {
-        tx |= 0;
-        ty |= 0;
-    }
-
-    ctx.save();
-
-    if (parentMatrix !== undefined)
-    {
-        var matrix = parentMatrix.matrix;
-        ctx.transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
-    }
-
-    ctx.translate(tx, ty);
-
-    ctx.rotate(src.rotation);
 
     ctx.translate(-src.displayOriginX, -src.displayOriginY);
 
-    ctx.scale(src.scaleX, src.scaleY);
+    var roundPixels = camera.roundPixels;
 
-    for (var index = 0; index < textLength; ++index)
+    for (var i = 0; i < textLength; i++)
     {
-        charCode = text.charCodeAt(index);
+        charCode = text.charCodeAt(i);
 
         if (charCode === 10)
         {
+            currentLine++;
+
+            if (align === 1)
+            {
+                lineOffsetX = (lineData.longest - lineData.lengths[currentLine]) / 2;
+            }
+            else if (align === 2)
+            {
+                lineOffsetX = (lineData.longest - lineData.lengths[currentLine]);
+            }
+
             xAdvance = 0;
-            indexCount = 0;
             yAdvance += lineHeight;
             lastGlyph = null;
+
             continue;
         }
 
@@ -136,7 +129,7 @@ var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage,
         glyphW = glyph.width;
         glyphH = glyph.height;
 
-        x = indexCount + glyph.xOffset + xAdvance;
+        x = glyph.xOffset + xAdvance;
         y = glyph.yOffset + yAdvance;
 
         if (lastGlyph !== null)
@@ -148,8 +141,9 @@ var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage,
         x *= scale;
         y *= scale;
 
+        x += lineOffsetX;
+
         xAdvance += glyph.xAdvance + letterSpacing;
-        indexCount += 1;
         lastGlyph = glyph;
         lastCharCode = charCode;
 
@@ -161,8 +155,8 @@ var BitmapTextCanvasRenderer = function (renderer, src, interpolationPercentage,
 
         if (roundPixels)
         {
-            x |= 0;
-            y |= 0;
+            x = Math.round(x);
+            y = Math.round(y);
         }
 
         ctx.save();

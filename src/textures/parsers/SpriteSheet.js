@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var GetFastValue = require('../../utils/object/GetFastValue');
@@ -13,7 +13,7 @@ var GetFastValue = require('../../utils/object/GetFastValue');
  * same size and cannot be trimmed or rotated.
  *
  * @function Phaser.Textures.Parsers.SpriteSheet
- * @memberOf Phaser.Textures.Parsers
+ * @memberof Phaser.Textures.Parsers
  * @private
  * @since 3.0.0
  *
@@ -57,6 +57,11 @@ var SpriteSheet = function (texture, sourceIndex, x, y, width, height, config)
     var row = Math.floor((width - margin + spacing) / (frameWidth + spacing));
     var column = Math.floor((height - margin + spacing) / (frameHeight + spacing));
     var total = row * column;
+
+    if (total === 0)
+    {
+        console.warn('SpriteSheet frame dimensions will result in zero frames.');
+    }
 
     if (startFrame > total || startFrame < -total)
     {

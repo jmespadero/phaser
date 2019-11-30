@@ -1,21 +1,30 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../../utils/Class');
 
 /**
  * @classdesc
- * [description]
+ * A seeded Random Data Generator.
+ * 
+ * Access via `Phaser.Math.RND` which is an instance of this class pre-defined
+ * by Phaser. Or, create your own instance to use as you require.
+ * 
+ * The `Math.RND` generator is seeded by the Game Config property value `seed`.
+ * If no such config property exists, a random number is used.
+ * 
+ * If you create your own instance of this class you should provide a seed for it.
+ * If no seed is given it will use a 'random' one based on Date.now.
  *
  * @class RandomDataGenerator
- * @memberOf Phaser.Math
+ * @memberof Phaser.Math
  * @constructor
  * @since 3.0.0
  *
- * @param {string[]} [seeds] - [description]
+ * @param {(string|string[])} [seeds] - The seeds to use for the random number generator.
  */
 var RandomDataGenerator = new Class({
 
@@ -23,6 +32,8 @@ var RandomDataGenerator = new Class({
 
     function RandomDataGenerator (seeds)
     {
+        if (seeds === undefined) { seeds = [ (Date.now() * Math.random()).toString() ]; }
+
         /**
          * Internal var.
          *
@@ -79,7 +90,7 @@ var RandomDataGenerator = new Class({
         this.n = 0;
 
         /**
-         * [description]
+         * Signs to choose from.
          *
          * @name Phaser.Math.RandomDataGenerator#signs
          * @type {number[]}
@@ -100,7 +111,7 @@ var RandomDataGenerator = new Class({
      * @since 3.0.0
      * @private
      *
-     * @return {number} [description]
+     * @return {number} A random number.
      */
     rnd: function ()
     {
@@ -121,7 +132,7 @@ var RandomDataGenerator = new Class({
      * @since 3.0.0
      * @private
      *
-     * @param {string} data - [description]
+     * @param {string} data - The value to hash.
      *
      * @return {number} The hashed value.
      */
@@ -150,12 +161,12 @@ var RandomDataGenerator = new Class({
     },
 
     /**
-     * [description]
+     * Initialize the state of the random data generator.
      *
      * @method Phaser.Math.RandomDataGenerator#init
      * @since 3.0.0
      *
-     * @param {(string|string[])} seeds - [description]
+     * @param {(string|string[])} seeds - The seeds to initialize the random data generator with.
      */
     init: function (seeds)
     {
@@ -456,8 +467,8 @@ var RandomDataGenerator = new Class({
      *
      * @method Phaser.Math.RandomDataGenerator#shuffle
      * @since 3.7.0
-     * 
-     * @param {array[]} [array] - The array to be shuffled.
+     *
+     * @param {array} [array] - The array to be shuffled.
      *
      * @return {array} The shuffled array.
      */
@@ -467,7 +478,7 @@ var RandomDataGenerator = new Class({
 
         for (var i = len; i > 0; i--)
         {
-            var randomIndex = Math.floor(this.frac() * (len + 1));
+            var randomIndex = Math.floor(this.frac() * (i + 1));
             var itemAtIndex = array[randomIndex];
 
             array[randomIndex] = array[i];

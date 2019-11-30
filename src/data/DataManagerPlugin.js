@@ -1,12 +1,13 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 var Class = require('../utils/Class');
 var DataManager = require('./DataManager');
 var PluginCache = require('../plugins/PluginCache');
+var SceneEvents = require('../scene/events');
 
 /**
  * @classdesc
@@ -16,11 +17,11 @@ var PluginCache = require('../plugins/PluginCache');
  *
  * @class DataManagerPlugin
  * @extends Phaser.Data.DataManager
- * @memberOf Phaser.Data
+ * @memberof Phaser.Data
  * @constructor
  * @since 3.0.0
  *
- * @param {Phaser.Scene} scene - [description]
+ * @param {Phaser.Scene} scene - A reference to the Scene that this DataManager belongs to.
  */
 var DataManagerPlugin = new Class({
 
@@ -33,7 +34,7 @@ var DataManagerPlugin = new Class({
         DataManager.call(this, scene, scene.sys.events);
 
         /**
-         * [description]
+         * A reference to the Scene that this DataManager belongs to.
          *
          * @name Phaser.Data.DataManagerPlugin#scene
          * @type {Phaser.Scene}
@@ -42,7 +43,7 @@ var DataManagerPlugin = new Class({
         this.scene = scene;
 
         /**
-         * [description]
+         * A reference to the Scene's Systems.
          *
          * @name Phaser.Data.DataManagerPlugin#systems
          * @type {Phaser.Scenes.Systems}
@@ -50,8 +51,8 @@ var DataManagerPlugin = new Class({
          */
         this.systems = scene.sys;
 
-        scene.sys.events.once('boot', this.boot, this);
-        scene.sys.events.on('start', this.start, this);
+        scene.sys.events.once(SceneEvents.BOOT, this.boot, this);
+        scene.sys.events.on(SceneEvents.START, this.start, this);
     },
 
     /**
@@ -66,7 +67,7 @@ var DataManagerPlugin = new Class({
     {
         this.events = this.systems.events;
 
-        this.events.once('destroy', this.destroy, this);
+        this.events.once(SceneEvents.DESTROY, this.destroy, this);
     },
 
     /**
@@ -80,7 +81,7 @@ var DataManagerPlugin = new Class({
      */
     start: function ()
     {
-        this.events.once('shutdown', this.shutdown, this);
+        this.events.once(SceneEvents.SHUTDOWN, this.shutdown, this);
     },
 
     /**
@@ -93,7 +94,7 @@ var DataManagerPlugin = new Class({
      */
     shutdown: function ()
     {
-        this.systems.events.off('shutdown', this.shutdown, this);
+        this.systems.events.off(SceneEvents.SHUTDOWN, this.shutdown, this);
     },
 
     /**
@@ -107,7 +108,7 @@ var DataManagerPlugin = new Class({
     {
         DataManager.prototype.destroy.call(this);
 
-        this.events.off('start', this.start, this);
+        this.events.off(SceneEvents.START, this.start, this);
 
         this.scene = null;
         this.systems = null;

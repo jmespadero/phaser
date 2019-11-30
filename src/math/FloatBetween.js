@@ -1,7 +1,7 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
 /**
@@ -10,10 +10,10 @@
  * @function Phaser.Math.FloatBetween
  * @since 3.0.0
  *
- * @param {float} min - The lower bound for the float, inclusive.
- * @param {float} max - The upper bound for the float exclusive.
+ * @param {number} min - The lower bound for the float, inclusive.
+ * @param {number} max - The upper bound for the float exclusive.
  *
- * @return {float} A random float within the given range.
+ * @return {number} A random float within the given range.
  */
 var FloatBetween = function (min, max)
 {

@@ -1,11 +1,9 @@
 /**
  * @author       Richard Davey <rich@photonstorm.com>
  * @author       Felipe Alfonso <@bitnenfer>
- * @copyright    2018 Photon Storm Ltd.
- * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
+ * @copyright    2019 Photon Storm Ltd.
+ * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
-
-var GameObject = require('../GameObject');
 
 /**
  * Renders this Game Object with the Canvas Renderer to the given Camera.
@@ -24,19 +22,16 @@ var GameObject = require('../GameObject');
  */
 var ContainerCanvasRenderer = function (renderer, container, interpolationPercentage, camera, parentMatrix)
 {
-    if (GameObject.RENDER_MASK !== container.renderFlags || (container.cameraFilter > 0 && (container.cameraFilter & camera._id)))
+    var children = container.list;
+
+    if (children.length === 0)
     {
         return;
     }
 
-    var children = container.list;
     var transformMatrix = container.localTransform;
     
-    if (parentMatrix === undefined)
-    {
-        transformMatrix.applyITRS(container.x, container.y, container.rotation, container.scaleX, container.scaleY);
-    }
-    else
+    if (parentMatrix)
     {
         transformMatrix.loadIdentity();
         transformMatrix.multiply(parentMatrix);
@@ -44,21 +39,50 @@ var ContainerCanvasRenderer = function (renderer, container, interpolationPercen
         transformMatrix.rotate(container.rotation);
         transformMatrix.scale(container.scaleX, container.scaleY);
     }
+    else
+    {
+        transformMatrix.applyITRS(container.x, container.y, container.rotation, container.scaleX, container.scaleY);
+    }
+
+    var containerHasBlendMode = (container.blendMode !== -1);
+
+    if (!containerHasBlendMode)
+    {
+        //  If Container is SKIP_TEST then set blend mode to be Normal
+        renderer.setBlendMode(0);
+    }
 
     var alpha = container._alpha;
     var scrollFactorX = container.scrollFactorX;
     var scrollFactorY = container.scrollFactorY;
 
-    for (var index = 0; index < children.length; ++index)
+    for (var i = 0; i < children.length; i++)
     {
-        var child = children[index];
-        var childAlpha = child._alpha;
+        var child = children[i];
+
+        if (!child.willRender(camera))
+        {
+            continue;
+        }
+
+        var childAlpha = child.alpha;
         var childScrollFactorX = child.scrollFactorX;
         var childScrollFactorY = child.scrollFactorY;
 
+        if (!containerHasBlendMode && child.blendMode !== renderer.currentBlendMode)
+        {
+            //  If Container doesn't have its own blend mode, then a child can have one
+            renderer.setBlendMode(child.blendMode);
+        }
+
+        //  Set parent values
         child.setScrollFactor(childScrollFactorX * scrollFactorX, childScrollFactorY * scrollFactorY);
         child.setAlpha(childAlpha * alpha);
+
+        //  Render
         child.renderCanvas(renderer, child, interpolationPercentage, camera, transformMatrix);
+
+        //  Restore original values
         child.setAlpha(childAlpha);
         child.setScrollFactor(childScrollFactorX, childScrollFactorY);
     }
